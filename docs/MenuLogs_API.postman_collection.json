@@ -1,0 +1,2424 @@
+{
+	"info": {
+		"_postman_id": "menulogs-api-collection",
+		"name": "MenuLogs API",
+		"description": "Complete API collection for MenuLogs - Restaurant Menu Management SaaS Platform\n\n**Base URL:** `{{base_url}}/api/v1`\n\n**🔗 NEW: Slug-Based URLs**\n- Locations now support SEO-friendly slugs (e.g., `downtown-pizza`)\n- Public menu available at: `/public/locations/by-slug/:slug/menu`\n- Use `/locations/check-slug/:slug` to verify availability\n- See \"🌐 Public API\" section for slug-based endpoints\n\n**📤 NEW: File Upload Support**\n- Business, Category, Banner, and MenuItem create/update endpoints now support file uploads\n- Accept both JSON (application/json) and multipart/form-data\n- For file uploads: use `image` field (single file) or `images` field (multiple files)\n- Files are automatically uploaded to S3, optimized, and URLs are stored\n- Old files are automatically deleted from S3 when updated\n- Max file size: 10MB per file\n- Supported formats: JPG, PNG, WebP, GIF\n\n**Authentication:**\n- Use Bearer token in Authorization header\n- Access token expires in 15 minutes\n- Use `/auth/refresh` to get new token\n\n**Demo Credentials:**\n- Email: `demo@restaurant.com`\n- Password: `demo123`\n\n**Setup:**\n1. Import this collection\n2. Import environment variables\n3. Run \"Auth - Login\" to get access token\n4. Token will be automatically saved to `accessToken` variable",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "menulogs"
+	},
+	"item": [
+		{
+			"name": "🌐 Public API",
+			"item": [
+				{
+					"name": "Get Location Menu by Slug (NEW)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has location and categories\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('location');",
+									"    pm.expect(jsonData).to.have.property('categories');",
+									"    pm.expect(jsonData.location).to.have.property('slug');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/public/locations/by-slug/:slug/menu",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"public",
+								"locations",
+								"by-slug",
+								":slug",
+								"menu"
+							],
+							"variable": [
+								{
+									"key": "slug",
+									"value": "downtown-pizza",
+									"description": "Location slug (e.g., downtown-pizza)"
+								}
+							]
+						},
+						"description": "Get complete menu for a restaurant location using a friendly slug.\n\n**NEW - Recommended:** Use slug-based URLs for better SEO and user experience.\n\n**No authentication required** - This is the customer-facing endpoint.\n\n**Example:** `/public/locations/by-slug/downtown-pizza/menu`"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Category Items by Slug (NEW)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has location and category\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('location');",
+									"    pm.expect(jsonData).to.have.property('category');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/public/locations/by-slug/:slug/categories/:categoryId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"public",
+								"locations",
+								"by-slug",
+								":slug",
+								"categories",
+								":categoryId"
+							],
+							"variable": [
+								{
+									"key": "slug",
+									"value": "downtown-pizza",
+									"description": "Location slug"
+								},
+								{
+									"key": "categoryId",
+									"value": "{{categoryId}}",
+									"description": "Category UUID"
+								}
+							]
+						},
+						"description": "Get all menu items in a specific category using location slug.\n\n**NEW - Recommended:** Use slug-based URLs for better SEO.\n\n**Example:** `/public/locations/by-slug/downtown-pizza/categories/{categoryId}`"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Location Menu (Legacy - UUID)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has location and categories\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('location');",
+									"    pm.expect(jsonData).to.have.property('categories');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/public/locations/:locationId/menu",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"public",
+								"locations",
+								":locationId",
+								"menu"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Get complete menu for a restaurant location including categories, items, and banners.\n\n**Legacy endpoint** - For backward compatibility. Use slug-based endpoint instead: `/public/locations/by-slug/:slug/menu`\n\n**No authentication required** - This is the customer-facing endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Menu Item Details",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has menuItem\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('menuItem');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Session-ID",
+								"value": "{{$randomUUID}}",
+								"description": "Optional session ID for analytics"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/public/menu-items/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"public",
+								"menu-items",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{menuItemId}}",
+									"description": "Menu item UUID"
+								}
+							]
+						},
+						"description": "Get detailed information about a specific menu item.\n\nTracks view analytics automatically."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Menu Items",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has results array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('results');",
+									"    pm.expect(jsonData.results).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/public/search?q=truffle&locationId={{locationId}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"public",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "truffle",
+									"description": "Search query"
+								},
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Search menu items by name, description, or tags.\n\n**Query Parameters:**\n- `q` (required): Search query\n- `locationId` (required): Location UUID"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Category Items (Legacy - UUID)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has category\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('category');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/public/locations/:locationId/categories/:categoryId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"public",
+								"locations",
+								":locationId",
+								"categories",
+								":categoryId"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								},
+								{
+									"key": "categoryId",
+									"value": "{{categoryId}}",
+									"description": "Category UUID"
+								}
+							]
+						},
+						"description": "Get all menu items in a specific category for a location.\n\n**Legacy endpoint** - For backward compatibility. Use slug-based endpoint instead: `/public/locations/by-slug/:slug/categories/:categoryId`"
+					},
+					"response": []
+				}
+			],
+			"description": "Public endpoints - No authentication required. These are customer-facing APIs."
+		},
+		{
+			"name": "🔐 Authentication",
+			"item": [
+				{
+					"name": "Signup",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has accessToken\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('accessToken');",
+									"    ",
+									"    // Save token to environment",
+									"    if (jsonData.accessToken) {",
+									"        pm.environment.set('accessToken', jsonData.accessToken);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john@restaurant.com\",\n    \"password\": \"securePassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/signup",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"signup"
+							]
+						},
+						"description": "Create a new restaurant owner account.\n\n**Body:**\n- `name`: Full name\n- `email`: Email address (must be unique)\n- `password`: Password (min 6 characters)"
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has accessToken\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('accessToken');",
+									"    ",
+									"    // Save token and IDs to environment",
+									"    if (jsonData.accessToken) {",
+									"        pm.environment.set('accessToken', jsonData.accessToken);",
+									"    }",
+									"    ",
+									"    if (jsonData.user && jsonData.user.id) {",
+									"        pm.environment.set('userId', jsonData.user.id);",
+									"    }",
+									"    ",
+									"    if (jsonData.business && jsonData.business.id) {",
+									"        pm.environment.set('businessId', jsonData.business.id);",
+									"    }",
+									"    ",
+									"    if (jsonData.locations && jsonData.locations.length > 0) {",
+									"        pm.environment.set('locationId', jsonData.locations[0].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"demo@restaurant.com\",\n    \"password\": \"demo123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Authenticate and receive access token.\n\n**Demo Credentials:**\n- Email: `demo@restaurant.com`\n- Password: `demo123`\n\n**Response:**\n- Saves `accessToken` to environment automatically\n- Saves `userId`, `businessId`, `locationId` if available"
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has new accessToken\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('accessToken');",
+									"    ",
+									"    // Update token",
+									"    if (jsonData.accessToken) {",
+									"        pm.environment.set('accessToken', jsonData.accessToken);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/refresh",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"refresh"
+							]
+						},
+						"description": "Get a new access token using refresh token.\n\n**Note:** Refresh token is typically stored in httpOnly cookie, but can also be sent in body."
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Clear token from environment",
+									"pm.environment.unset('accessToken');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"logout"
+							]
+						},
+						"description": "Logout and invalidate refresh token.\n\nClears access token from environment automatically."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Ensure we have access token",
+									"if (!pm.environment.get('accessToken')) {",
+									"    console.log('⚠️  No access token found. Please run Login first.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has user data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('user');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/me",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"me"
+							]
+						},
+						"description": "Get authenticated user's profile, business, and locations.\n\n**Requires:** Bearer token in Authorization header"
+					},
+					"response": []
+				}
+			],
+			"description": "Authentication endpoints for restaurant owners."
+		},
+		{
+			"name": "🏢 Business Management",
+			"item": [
+				{
+					"name": "List Businesses",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/businesses",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"businesses"
+							]
+						},
+						"description": "Get all businesses owned by the authenticated user."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Business",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has business\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('business');",
+									"    ",
+									"    // Save business ID",
+									"    if (jsonData.business && jsonData.business.id) {",
+									"        pm.environment.set('businessId', jsonData.business.id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"My Restaurant Group\",\n    \"logo\": \"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=200\",\n    \"description\": \"Premium dining experience\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/businesses",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"businesses"
+							]
+						},
+						"description": "Create a new business.\n\n**Supports two request formats:**\n\n1. **JSON (application/json)** - For backward compatibility:\n   - `name` (required): Business name\n   - `logo` (optional): Logo URL or base64 data URL\n   - `description` (optional): Business description\n\n2. **Multipart/form-data** - For file uploads:\n   - `name` (required): Business name\n   - `image` (optional): Logo file (JPG, PNG, WebP, GIF)\n   - `description` (optional): Business description\n\n**Note:** If `image` file is provided, it will be uploaded to S3 and the logo URL will be automatically set. If `logo` URL/base64 is provided in JSON, it will be used directly."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Business",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/businesses/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"businesses",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{businessId}}",
+									"description": "Business UUID"
+								}
+							]
+						},
+						"description": "Get details of a specific business."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Business",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Restaurant Group\",\n    \"description\": \"Updated description\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/businesses/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"businesses",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{businessId}}",
+									"description": "Business UUID"
+								}
+							]
+						},
+						"description": "Update business details. All fields are optional.\n\n**Supports two request formats:**\n\n1. **JSON (application/json)** - For backward compatibility:\n   - `name` (optional): Business name\n   - `logo` (optional): Logo URL or base64 data URL\n   - `description` (optional): Business description\n\n2. **Multipart/form-data** - For file uploads:\n   - `name` (optional): Business name\n   - `image` (optional): Logo file (JPG, PNG, WebP, GIF)\n   - `description` (optional): Business description\n\n**Note:** If `image` file is uploaded, old logo will be deleted from S3 and replaced with new one."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Business",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/businesses/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"businesses",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{businessId}}",
+									"description": "Business UUID"
+								}
+							]
+						},
+						"description": "Delete a business. **Warning:** This will cascade delete all locations, categories, menu items, and banners."
+					},
+					"response": []
+				}
+			],
+			"description": "Business management endpoints. A business can have multiple locations."
+		},
+		{
+			"name": "📍 Location Management",
+			"item": [
+				{
+					"name": "List Locations",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/locations",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"locations"
+							]
+						},
+						"description": "Get all locations for authenticated user's businesses."
+					},
+					"response": []
+				},
+				{
+					"name": "Check Slug Availability",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has available property\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('available');",
+									"    pm.expect(jsonData).to.have.property('slug');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/locations/check-slug/:slug?excludeId=",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"locations",
+								"check-slug",
+								":slug"
+							],
+							"query": [
+								{
+									"key": "excludeId",
+									"value": "",
+									"description": "Optional: Location ID to exclude (for updates)",
+									"disabled": true
+								}
+							],
+							"variable": [
+								{
+									"key": "slug",
+									"value": "downtown-pizza",
+									"description": "Slug to check (e.g., downtown-pizza)"
+								}
+							]
+						},
+						"description": "Check if a slug is available for use.\n\n**Slug Requirements:**\n- 3-50 characters\n- Lowercase letters, numbers, and hyphens only\n- Must start/end with alphanumeric\n- No consecutive hyphens\n- Globally unique\n\n**Query Parameters:**\n- `excludeId` (optional): Location ID to exclude when checking (useful for updates)\n\n**Response:**\n- `available: true` - Slug is available\n- `available: false` - Slug is already taken"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Location",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has location\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('location');",
+									"    ",
+									"    // Save location ID",
+									"    if (jsonData.location && jsonData.location.id) {",
+									"        pm.environment.set('locationId', jsonData.location.id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"businessId\": \"{{businessId}}\",\n    \"name\": \"Downtown Branch\",\n    \"slug\": \"downtown-branch-nyc\",\n    \"address\": \"123 Main Street\",\n    \"city\": \"New York\",\n    \"state\": \"NY\",\n    \"zipCode\": \"10001\",\n    \"country\": \"USA\",\n    \"phone\": \"+1 (555) 123-4567\",\n    \"email\": \"downtown@restaurant.com\",\n    \"isActive\": true,\n    \"openingHours\": {\n        \"monday\": { \"isOpen\": true, \"openTime\": \"11:00\", \"closeTime\": \"22:00\" },\n        \"tuesday\": { \"isOpen\": true, \"openTime\": \"11:00\", \"closeTime\": \"22:00\" },\n        \"wednesday\": { \"isOpen\": true, \"openTime\": \"11:00\", \"closeTime\": \"22:00\" },\n        \"thursday\": { \"isOpen\": true, \"openTime\": \"11:00\", \"closeTime\": \"22:00\" },\n        \"friday\": { \"isOpen\": true, \"openTime\": \"11:00\", \"closeTime\": \"23:00\" },\n        \"saturday\": { \"isOpen\": true, \"openTime\": \"10:00\", \"closeTime\": \"23:00\" },\n        \"sunday\": { \"isOpen\": true, \"openTime\": \"10:00\", \"closeTime\": \"21:00\" }\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/locations",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"locations"
+							]
+						},
+						"description": "Create a new location (restaurant branch).\n\n**Note:** Automatically starts with 14-day free trial.\n\n**Body:**\n- `businessId` (required): Business UUID\n- `name`, `address`, `city`, `state`, `zipCode`, `country`, `phone`, `email` (required)\n- `slug` (optional): URL-friendly identifier (e.g., `downtown-branch-nyc`)\n  - Auto-generated from `name` + `city` if not provided\n  - Must be 3-50 characters, lowercase alphanumeric + hyphens only\n  - Must be globally unique\n  - Use `/locations/check-slug/:slug` to verify availability\n- `openingHours` (required): JSON object with days of week\n- `isActive` (optional): Defaults to true\n\n**Slug Examples:**\n- `downtown-pizza`\n- `times-square-bistro`\n- `brooklyn-sushi-bar`"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Location",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/locations/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"locations",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Get details of a specific location."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Location",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Branch Name\",\n    \"phone\": \"+1 (555) 999-8888\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/locations/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"locations",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Update location details. All fields are optional.\n\n**Slug Updates:**\n- `slug` can be updated after creation\n- Must pass uniqueness check (excluding current location)\n- Use `/locations/check-slug/:slug?excludeId={locationId}` to verify availability before updating"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Location",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/locations/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"locations",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Delete a location. **Warning:** This will cascade delete all categories, menu items, and banners for this location."
+					},
+					"response": []
+				}
+			],
+			"description": "Location management endpoints. Each location has its own menu, categories, and banners.\n\n**🔗 NEW: Slug Support**\n- Each location now has a unique `slug` for SEO-friendly URLs\n- Use `/locations/check-slug/:slug` to verify availability\n- Slugs are auto-generated from name + city if not provided\n- Public menu available at: `/public/locations/by-slug/:slug/menu`"
+		},
+		{
+			"name": "📑 Category Management",
+			"item": [
+				{
+					"name": "List Categories",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/categories/locations/:locationId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"categories",
+								"locations",
+								":locationId"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Get all categories for a location."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has category\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('category');",
+									"    ",
+									"    // Save category ID",
+									"    if (jsonData.category && jsonData.category.id) {",
+									"        pm.environment.set('categoryId', jsonData.category.id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Desserts\",\n    \"description\": \"Sweet endings to remember\",\n    \"image\": \"https://images.unsplash.com/photo-1551024601-bec78aea704b?w=800\",\n    \"icon\": \"Cake\",\n    \"isVisible\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/categories/locations/:locationId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"categories",
+								"locations",
+								":locationId"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Create a new category for a location.\n\n**Supports two request formats:**\n\n1. **JSON (application/json)** - For backward compatibility:\n   - `name` (required): Category name\n   - `description` (optional): Category description\n   - `image` (required): Image URL or base64 data URL\n   - `icon` (optional): Icon name (default: ChefHat)\n   - `isVisible` (optional): Defaults to true\n\n2. **Multipart/form-data** - For file uploads:\n   - `name` (required): Category name\n   - `description` (optional): Category description\n   - `image` (required): Image file (JPG, PNG, WebP, GIF)\n   - `icon` (optional): Icon name (default: ChefHat)\n   - `isVisible` (optional): true/false string or boolean\n\n**Note:** If `image` file is provided, it will be uploaded to S3 (max 1024x1024, auto-resized)."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Category",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Category Name\",\n    \"description\": \"Updated description\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/categories/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"categories",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{categoryId}}",
+									"description": "Category UUID"
+								}
+							]
+						},
+						"description": "Update category details. All fields are optional.\n\n**Supports two request formats:**\n\n1. **JSON (application/json)** - For backward compatibility:\n   - All fields same as create (all optional)\n\n2. **Multipart/form-data** - For file uploads:\n   - `name` (optional): Category name\n   - `description` (optional): Category description\n   - `image` (optional): Image file (JPG, PNG, WebP, GIF)\n   - `icon` (optional): Icon name\n   - `isVisible` (optional): true/false string or boolean\n\n**Note:** If `image` file is uploaded, old image will be deleted from S3 and replaced."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Category",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/categories/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"categories",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{categoryId}}",
+									"description": "Category UUID"
+								}
+							]
+						},
+						"description": "Delete a category. **Warning:** This will cascade delete all menu items in this category."
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Visibility",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/categories/:id/visibility",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"categories",
+								":id",
+								"visibility"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{categoryId}}",
+									"description": "Category UUID"
+								}
+							]
+						},
+						"description": "Toggle category visibility (show/hide from public menu)."
+					},
+					"response": []
+				}
+			],
+			"description": "Category management endpoints. Categories organize menu items."
+		},
+		{
+			"name": "🍽️ Menu Items Management",
+			"item": [
+				{
+					"name": "List Menu Items",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/menu-items/locations/:locationId?categoryId=&availability=&search=",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"menu-items",
+								"locations",
+								":locationId"
+							],
+							"query": [
+								{
+									"key": "categoryId",
+									"value": "",
+									"description": "Filter by category UUID",
+									"disabled": true
+								},
+								{
+									"key": "availability",
+									"value": "",
+									"description": "Filter by availability: IN_STOCK, OUT_OF_STOCK, HIDDEN",
+									"disabled": true
+								},
+								{
+									"key": "search",
+									"value": "",
+									"description": "Search in name/description",
+									"disabled": true
+								}
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Get all menu items for a location.\n\n**Query Parameters (all optional):**\n- `categoryId`: Filter by category\n- `availability`: Filter by availability status\n- `search`: Search in name/description"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Menu Item",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has menuItem\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('menuItem');",
+									"    ",
+									"    // Save menu item ID",
+									"    if (jsonData.menuItem && jsonData.menuItem.id) {",
+									"        pm.environment.set('menuItemId', jsonData.menuItem.id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"categoryId\": \"{{categoryId}}\",\n    \"name\": \"Wagyu Beef Tenderloin\",\n    \"description\": \"Premium A5 Wagyu beef with roasted root vegetables, red wine demi-glace\",\n    \"price\": 89.00,\n    \"image\": \"https://images.unsplash.com/photo-1544025162-d76694265947?w=800\",\n    \"images\": [\"https://images.unsplash.com/photo-1544025162-d76694265947?w=800\"],\n    \"video\": \"https://example.com/video.mp4\",\n    \"ingredients\": [\"A5 Wagyu beef\", \"Root vegetables\", \"Red wine\", \"Beef jus\"],\n    \"allergens\": [\"Dairy\"],\n    \"tags\": [\"Chef Special\", \"Premium\"],\n    \"nutritionalInfo\": {\n        \"calories\": 680,\n        \"protein\": \"52g\",\n        \"carbs\": \"18g\",\n        \"fat\": \"46g\"\n    },\n    \"isVegetarian\": false,\n    \"isVegan\": false,\n    \"isGlutenFree\": true,\n    \"spicyLevel\": 0,\n    \"availability\": \"IN_STOCK\",\n    \"preparationTime\": \"25 mins\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/menu-items/locations/:locationId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"menu-items",
+								"locations",
+								":locationId"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Create a new menu item.\n\n**Supports two request formats:**\n\n1. **JSON (application/json)** - For backward compatibility:\n   - `categoryId` (required): Category UUID\n   - `name`, `description`, `price`, `image` (required)\n   - `images` (optional array): Array of image URLs/base64 (max 3)\n   - `video`, `ingredients`, `allergens`, `tags` (optional arrays)\n   - `nutritionalInfo` (optional JSON object)\n   - `isVegetarian`, `isVegan`, `isGlutenFree` (optional booleans)\n   - `spicyLevel` (optional, 0-5)\n   - `availability` (optional): IN_STOCK, OUT_OF_STOCK, HIDDEN\n   - `preparationTime` (optional string)\n\n2. **Multipart/form-data** - For file uploads:\n   - `categoryId` (required): Category UUID\n   - `name` (required): Menu item name\n   - `description` (required): Description\n   - `price` (required): Price as number or string\n   - `images` (optional, multiple): Image files (JPG, PNG, WebP, GIF) - up to 3 images\n   - `video` (optional): Video URL\n   - `ingredients` (optional): JSON string array or comma-separated\n   - `allergens` (optional): JSON string array or comma-separated\n   - `tags` (optional): JSON string array or comma-separated\n   - `nutritionalInfo` (optional): JSON string\n   - `isVegetarian`, `isVegan`, `isGlutenFree` (optional): true/false strings\n   - `spicyLevel` (optional): 0-5 as string\n   - `availability` (optional): IN_STOCK, OUT_OF_STOCK, HIDDEN\n   - `preparationTime` (optional): String\n\n**Note:** If `images` files are provided, they will be uploaded to S3 (max 1920x1920, auto-resized). First image becomes the main image."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Menu Item",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Item Name\",\n    \"price\": 95.00,\n    \"description\": \"Updated description\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/menu-items/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"menu-items",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{menuItemId}}",
+									"description": "Menu item UUID"
+								}
+							]
+						},
+						"description": "Update menu item details. All fields are optional.\n\n**Supports two request formats:**\n\n1. **JSON (application/json)** - For backward compatibility:\n   - All fields same as create (all optional)\n\n2. **Multipart/form-data** - For file uploads:\n   - Same fields as create (all optional)\n   - `images` (optional, multiple): Image files (up to 3) - replaces all existing images\n   - Arrays should be sent as JSON strings in form-data\n\n**Note:** If `images` files are uploaded, old images will be deleted from S3 and replaced. Images not in the new set will be removed."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Menu Item",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/menu-items/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"menu-items",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{menuItemId}}",
+									"description": "Menu item UUID"
+								}
+							]
+						},
+						"description": "Delete a menu item."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Availability",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"availability\": \"OUT_OF_STOCK\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/menu-items/:id/availability",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"menu-items",
+								":id",
+								"availability"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{menuItemId}}",
+									"description": "Menu item UUID"
+								}
+							]
+						},
+						"description": "Update menu item availability.\n\n**Body:**\n- `availability` (required): IN_STOCK, OUT_OF_STOCK, or HIDDEN"
+					},
+					"response": []
+				}
+			],
+			"description": "Menu item management endpoints. Menu items belong to categories."
+		},
+		{
+			"name": "🎨 Banner Management",
+			"item": [
+				{
+					"name": "List Banners",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/banners/locations/:locationId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"banners",
+								"locations",
+								":locationId"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Get all banners for a location."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Banner",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has banner\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('banner');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Summer Special\",\n    \"subtitle\": \"20% off all desserts\",\n    \"image\": \"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1600\",\n    \"video\": \"https://example.com/promo.mp4\",\n    \"link\": \"https://restaurant.com/promo\",\n    \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/banners/locations/:locationId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"banners",
+								"locations",
+								":locationId"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Create a new promotional banner.\n\n**Supports two request formats:**\n\n1. **JSON (application/json)** - For backward compatibility:\n   - `title` (required): Banner title\n   - `subtitle` (optional): Banner subtitle\n   - `image` (required): Image URL or base64 data URL\n   - `video` (optional): Video URL\n   - `link` (optional): Click-through URL\n   - `isActive` (optional): Defaults to true\n\n2. **Multipart/form-data** - For file uploads:\n   - `title` (required): Banner title\n   - `subtitle` (optional): Banner subtitle\n   - `image` (required): Image file (JPG, PNG, WebP, GIF)\n   - `video` (optional): Video URL\n   - `link` (optional): Click-through URL\n   - `isActive` (optional): true/false string or boolean\n\n**Note:** If `image` file is provided, it will be uploaded to S3 (max 1920x1080, auto-resized for banner format)."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Banner",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Updated Banner Title\",\n    \"isActive\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/banners/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"banners",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{bannerId}}",
+									"description": "Banner UUID"
+								}
+							]
+						},
+						"description": "Update banner details. All fields are optional.\n\n**Supports two request formats:**\n\n1. **JSON (application/json)** - For backward compatibility:\n   - All fields same as create (all optional)\n\n2. **Multipart/form-data** - For file uploads:\n   - `title` (optional): Banner title\n   - `subtitle` (optional): Banner subtitle\n   - `image` (optional): Image file (JPG, PNG, WebP, GIF)\n   - `video` (optional): Video URL\n   - `link` (optional): Click-through URL\n   - `isActive` (optional): true/false string or boolean\n\n**Note:** If `image` file is uploaded, old image will be deleted from S3 and replaced."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Banner",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/banners/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"banners",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{bannerId}}",
+									"description": "Banner UUID"
+								}
+							]
+						},
+						"description": "Delete a banner."
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Active Status",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/banners/:id/toggle",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"banners",
+								":id",
+								"toggle"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{bannerId}}",
+									"description": "Banner UUID"
+								}
+							]
+						},
+						"description": "Toggle banner active status (show/hide from public menu)."
+					},
+					"response": []
+				}
+			],
+			"description": "Banner management endpoints. Banners are promotional content displayed on the customer-facing menu."
+		},
+		{
+			"name": "💳 Subscription & Payment",
+			"item": [
+				{
+					"name": "Get Pricing Plans",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has plans array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('plans');",
+									"    pm.expect(jsonData.plans).to.be.an('array');",
+									"    pm.expect(jsonData.plans.length).to.be.above(0);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/plans",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions",
+								"plans"
+							]
+						},
+						"description": "Get all available subscription plans with pricing and features.\n\n**No authentication required** - This is a public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Subscription",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/:locationId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions",
+								":locationId"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Get subscription details for a specific location.\n\n**Response includes:**\n- Subscription status and plan\n- Billing cycle and next billing date\n- Recent invoices\n- Location information"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Subscription",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has subscription\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('subscription');",
+									"    ",
+									"    // Save subscription ID",
+									"    if (jsonData.subscription && jsonData.subscription.id) {",
+									"        pm.environment.set('subscriptionId', jsonData.subscription.id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"locationId\": \"{{locationId}}\",\n    \"plan\": \"PROFESSIONAL\",\n    \"billingCycle\": \"MONTHLY\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions"
+							]
+						},
+						"description": "Create a new subscription for a location.\n\n**Plans:**\n- `FREE` - $0/month (1 location, 20 items, 0 banners)\n- `STARTER` - $29/month (3 locations, 100 items, 5 banners)\n- `PROFESSIONAL` - $79/month (10 locations, 500 items, 20 banners)\n- `ENTERPRISE` - $199/month (unlimited everything)\n\n**Billing Cycles:**\n- `MONTHLY` - Standard monthly billing\n- `YEARLY` - 15% discount (billed annually)\n\n**Note:** Paid plans start with 14-day free trial."
+					},
+					"response": []
+				},
+				{
+					"name": "Change Plan (Upgrade/Downgrade)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has updated subscription\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('subscription');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"plan\": \"ENTERPRISE\",\n    \"billingCycle\": \"YEARLY\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/:id/change-plan",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions",
+								":id",
+								"change-plan"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{subscriptionId}}",
+									"description": "Subscription UUID"
+								}
+							]
+						},
+						"description": "Change subscription plan or billing cycle.\n\n**Body:**\n- `plan` (required): New plan (FREE, STARTER, PROFESSIONAL, ENTERPRISE)\n- `billingCycle` (optional): MONTHLY or YEARLY\n\n**Notes:**\n- Upgrading takes effect immediately\n- Downgrading to FREE removes paid features\n- Billing is prorated"
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Subscription",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Subscription is cancelled\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.subscription.status).to.equal('CANCELLED');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/:id/cancel",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions",
+								":id",
+								"cancel"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{subscriptionId}}",
+									"description": "Subscription UUID"
+								}
+							]
+						},
+						"description": "Cancel a subscription.\n\n**Note:**\n- Cancellation takes effect at end of billing cycle\n- Location is automatically downgraded to FREE plan\n- Access continues until billing cycle ends"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Billing History",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has invoices array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('invoices');",
+									"    pm.expect(jsonData.invoices).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/:locationId/billing-history",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions",
+								":locationId",
+								"billing-history"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Get all invoices and billing history for a location.\n\n**Response includes:**\n- Invoice amount and status\n- Payment dates\n- Razorpay payment IDs\n- Invoice descriptions"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Usage Stats",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has usage data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('usage');",
+									"    pm.expect(jsonData.usage).to.have.property('plan');",
+									"    pm.expect(jsonData.usage).to.have.property('limits');",
+									"    pm.expect(jsonData.usage).to.have.property('current');",
+									"    pm.expect(jsonData.usage).to.have.property('percentages');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/:locationId/usage",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions",
+								":locationId",
+								"usage"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Get current usage statistics and plan limits for a location.\n\n**Response includes:**\n- Current plan and limits\n- Current usage (menu items, banners)\n- Usage percentages\n- Helps determine if upgrade is needed"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Checkout Session",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has checkout session\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('checkout');",
+									"    pm.expect(jsonData.checkout).to.have.property('checkoutUrl');",
+									"    ",
+									"    // Log checkout URL for easy access",
+									"    console.log('Checkout URL:', jsonData.checkout.checkoutUrl);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"plan\": \"PROFESSIONAL\",\n    \"billingCycle\": \"MONTHLY\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/:locationId/checkout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions",
+								":locationId",
+								"checkout"
+							],
+							"variable": [
+								{
+									"key": "locationId",
+									"value": "{{locationId}}",
+									"description": "Location UUID"
+								}
+							]
+						},
+						"description": "Create a checkout session for payment.\n\n**Body:**\n- `plan` (required): Subscription plan\n- `billingCycle` (required): MONTHLY or YEARLY\n\n**Response:**\n- Returns checkout URL for Razorpay\n- Use this URL to redirect user to payment page\n\n**Note:** FREE plan returns error (no payment needed)"
+					},
+					"response": []
+				},
+				{
+					"name": "Razorpay Webhook",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Note: This endpoint requires Razorpay webhook signature",
+									"// In production, Razorpay will send requests with X-Razorpay-Signature header",
+									"// For testing, you may need to disable signature verification temporarily"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response indicates success\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Razorpay-Signature",
+								"value": "test_signature",
+								"description": "Razorpay webhook signature (required in production)"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"event\": \"subscription.activated\",\n    \"payload\": {\n        \"subscription\": {\n            \"id\": \"sub_xxxxx\"\n        },\n        \"payment\": {\n            \"id\": \"pay_xxxxx\",\n            \"amount\": 7900,\n            \"status\": \"captured\"\n        }\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/webhook",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions",
+								"webhook"
+							]
+						},
+						"description": "Handle Razorpay webhook events.\n\n**Events Handled:**\n- `subscription.activated` - Subscription activated\n- `subscription.charged` - Payment charged\n- `subscription.cancelled` - Subscription cancelled\n- `payment.failed` - Payment failed\n\n**Security:**\n- Requires `X-Razorpay-Signature` header\n- Signature verified using webhook secret\n- Invalid signatures are rejected\n\n**Note:** This endpoint does NOT require Bearer token authentication. It uses signature verification instead."
+					},
+					"response": []
+				}
+			],
+			"description": "Subscription and payment management endpoints. Manage subscription plans, billing, and Razorpay integration.\n\n**Pricing Plans:**\n- FREE: $0/month (1 location, 20 items, 0 banners)\n- STARTER: $29/month (3 locations, 100 items, 5 banners)\n- PROFESSIONAL: $79/month (10 locations, 500 items, 20 banners)\n- ENTERPRISE: $199/month (unlimited everything)\n\n**Billing:**\n- Monthly or Yearly (15% discount on yearly)\n- 14-day free trial for paid plans\n- Automatic invoice generation"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global pre-request script",
+					"// Check if base_url is set",
+					"if (!pm.environment.get('base_url')) {",
+					"    pm.environment.set('base_url', 'http://localhost:5000');",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script",
+					"// Log response time",
+					"pm.test('Response time is less than 2000ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(2000);",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000",
+			"type": "string"
+		}
+	]
+}
+
