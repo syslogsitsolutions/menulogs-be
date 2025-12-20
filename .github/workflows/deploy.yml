@@ -66,26 +66,9 @@ jobs:
           SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          
-          # Write SSH key (preserve newlines, remove trailing whitespace)
-          echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          
-          # Verify key format
-          head -1 ~/.ssh/deploy_key | grep -q "BEGIN" || (echo "❌ Invalid SSH key format" && exit 1)
-          
-          # Add EC2 host to known_hosts
-          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          chmod 644 ~/.ssh/known_hosts
-          
-          # Test SSH connection
-          ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=~/.ssh/known_hosts \
-            -o ConnectTimeout=10 \
-            ${{ env.EC2_USER }}@${{ env.EC2_HOST }} \
-            "echo 'SSH connection successful'" || echo "⚠️ SSH test failed, but continuing..."
+          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
         env:
@@ -93,11 +76,7 @@ jobs:
           EC2_USER: ${{ env.EC2_USER }}
           ENVIRONMENT: ${{ env.ENVIRONMENT }}
         run: |
-          ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=~/.ssh/known_hosts \
-            -o ConnectTimeout=30 \
-            ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'ENDSSH'
+          ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'ENDSSH'
             # Login to ECR
             aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
             
