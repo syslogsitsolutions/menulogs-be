@@ -5,11 +5,18 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json ./
+COPY package.json ./
+COPY package-lock.json* ./
 COPY prisma ./prisma/
 
 # Install dependencies
-RUN npm ci --legacy-peer-deps
+# Use npm ci if package-lock.json exists, otherwise npm install
+RUN if [ -f package-lock.json ]; then \
+      npm ci --legacy-peer-deps; \
+    else \
+      echo "⚠️ package-lock.json not found, using npm install"; \
+      npm install --legacy-peer-deps; \
+    fi
 
 # Generate Prisma Client
 RUN npx prisma generate
@@ -31,11 +38,18 @@ RUN apk add --no-cache openssl gcompat
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json ./
+COPY package.json ./
+COPY package-lock.json* ./
 COPY prisma ./prisma/
 
 # Install production dependencies only
-RUN npm ci --omit=dev --legacy-peer-deps
+# Use npm ci if package-lock.json exists, otherwise npm install
+RUN if [ -f package-lock.json ]; then \
+      npm ci --omit=dev --legacy-peer-deps; \
+    else \
+      echo "⚠️ package-lock.json not found, using npm install"; \
+      npm install --omit=dev --legacy-peer-deps; \
+    fi
 
 # Copy Prisma Client from builder
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
