@@ -44,17 +44,17 @@ COPY package.json ./
 COPY package-lock.json* ./
 COPY prisma ./prisma/
 
-# Install production dependencies + Prisma CLI (needed for migrations and generate)
-# Prisma CLI must match @prisma/client version
-# Install locally (not globally) so it works with non-root user
+# Install production dependencies
 RUN if [ -f package-lock.json ]; then \
-      npm ci --omit=dev --legacy-peer-deps && \
-      npm install prisma@6.19.1 --legacy-peer-deps --save-dev=false; \
+      npm ci --omit=dev --legacy-peer-deps; \
     else \
       echo "⚠️ package-lock.json not found, using npm install"; \
-      npm install --omit=dev --legacy-peer-deps && \
-      npm install prisma@6.19.1 --legacy-peer-deps --save-dev=false; \
+      npm install --omit=dev --legacy-peer-deps; \
     fi
+
+# Install Prisma CLI explicitly (must match @prisma/client version 6.x)
+# Force install to override any version in package-lock.json
+RUN npm install prisma@6.19.1 --legacy-peer-deps --save-dev=false --force
 
 # Regenerate Prisma Client in production stage to ensure correct binary target
 # This ensures the binary matches the Alpine Linux environment (linux-musl)
