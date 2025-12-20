@@ -42,13 +42,16 @@ COPY package.json ./
 COPY package-lock.json* ./
 COPY prisma ./prisma/
 
-# Install production dependencies only
-# Use npm ci if package-lock.json exists, otherwise npm install
+# Install production dependencies + Prisma CLI (needed for migrations)
+# Prisma CLI must match @prisma/client version
+# Install locally (not globally) so it works with non-root user
 RUN if [ -f package-lock.json ]; then \
-      npm ci --omit=dev --legacy-peer-deps; \
+      npm ci --omit=dev --legacy-peer-deps && \
+      npm install prisma@latest --legacy-peer-deps --save-dev=false; \
     else \
       echo "⚠️ package-lock.json not found, using npm install"; \
-      npm install --omit=dev --legacy-peer-deps; \
+      npm install --omit=dev --legacy-peer-deps && \
+      npm install prisma@latest --legacy-peer-deps --save-dev=false; \
     fi
 
 # Copy Prisma Client from builder (already generated with correct binary targets)

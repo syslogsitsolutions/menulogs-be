@@ -86,11 +86,16 @@ jobs:
             # Pull latest image
             docker-compose pull backend
             
+            # Run database migrations BEFORE restarting
+            # This ensures migrations are applied before the new code runs
+            echo "🔄 Running database migrations..."
+            docker-compose run --rm backend npx prisma migrate deploy
+            
+            # Verify migrations status
+            docker-compose run --rm backend npx prisma migrate status || true
+            
             # Restart backend service
             docker-compose up -d backend
-            
-            # Run database migrations
-            docker-compose exec -T backend npx prisma migrate deploy || true
             
             # Check health
             sleep 10
