@@ -51,9 +51,10 @@ RUN if [ -f package-lock.json ]; then \
       npm install --omit=dev --legacy-peer-deps; \
     fi
 
-# Generate Prisma Client for production (with correct binary targets)
-# This ensures the correct binary is available for Alpine Linux with OpenSSL 3.0.x
-RUN npx prisma generate
+# Copy Prisma Client from builder (already generated with correct binary targets)
+# The builder stage has the correct binaryTargets in schema.prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
