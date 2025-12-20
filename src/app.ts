@@ -17,9 +17,31 @@ app.use(helmet({
 }));
 
 // CORS configuration - must be before other middleware
+// Allow multiple origins for dev and prod
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'https://app.menulogs.in',
+  'https://app-dev.menulogs.in',
+].filter(Boolean); // Remove undefined values
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, Postman, curl)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        // In production, be strict; in development, allow all
+        if (process.env.NODE_ENV === 'production') {
+          callback(new Error('Not allowed by CORS'));
+        } else {
+          callback(null, true);
+        }
+      }
+    },
     credentials: true, // Allow cookies to be sent
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
