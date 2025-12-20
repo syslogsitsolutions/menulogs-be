@@ -19,6 +19,8 @@ RUN if [ -f package-lock.json ]; then \
     fi
 
 # Generate Prisma Client
+# Ignore checksum errors for binary downloads (offline/CI environments)
+ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 RUN npx prisma generate
 
 # Copy source code
