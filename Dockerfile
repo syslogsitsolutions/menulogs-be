@@ -1,81 +1,71 @@
-# Use Node.js 20 LTS as base image
+# ============================================
+# Builder Stage
+# ============================================
 FROM node:20-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
 # Copy package files
-COPY package.json ./
-COPY package-lock.json* ./
+COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
-# Install dependencies
-# Use npm ci if package-lock.json exists, otherwise npm install
+# Install all dependencies (including dev dependencies for build)
 RUN if [ -f package-lock.json ]; then \
       npm ci --legacy-peer-deps; \
     else \
-      echo "⚠️ package-lock.json not found, using npm install"; \
       npm install --legacy-peer-deps; \
     fi
 
-# Generate Prisma Client
-# Ignore checksum errors for binary downloads (offline/CI environments)
+# Generate Prisma Client with correct binary target for Alpine
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 RUN npx prisma generate
 
 # Copy source code
 COPY . .
 
-# Build TypeScript
+# Build TypeScript to JavaScript
 RUN npm run build
 
-# Production stage
+# ============================================
+# Production Stage
+# ============================================
 FROM node:20-alpine AS production
 
-# Install OpenSSL and required libraries for Prisma
-# Prisma needs libssl.so.1.1 - install openssl and gcompat
-# If Prisma still fails, it will use the musl-compatible binary
+# Install runtime dependencies for Prisma
 RUN apk add --no-cache openssl gcompat
 
 WORKDIR /app
 
 # Copy package files
-COPY package.json ./
-COPY package-lock.json* ./
-COPY prisma ./prisma/
+COPY package.json package-lock.json* ./
 
-# Install production dependencies
+# Install only production dependencies
 RUN if [ -f package-lock.json ]; then \
       npm ci --omit=dev --legacy-peer-deps; \
     else \
-      echo "⚠️ package-lock.json not found, using npm install"; \
       npm install --omit=dev --legacy-peer-deps; \
     fi
 
-# Install Prisma CLI explicitly (must match @prisma/client version 6.x)
-# Force install to override any version in package-lock.json
-RUN npm install prisma@6.19.1 --legacy-peer-deps --save-dev=false --force
+# Install Prisma CLI (needed for migrations, but not for generating client)
+# Prisma Client is copied from builder stage
+# Using --no-save to avoid modifying package.json
+RUN npm install prisma@^6.1.0 --legacy-peer-deps --no-save
 
-# Regenerate Prisma Client in production stage to ensure correct binary target
-# This ensures the binary matches the Alpine Linux environment (linux-musl)
-# Must be done before switching to non-root user
-ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
-RUN npx prisma generate
+# Copy Prisma Client from builder (includes generated client and binaries)
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/prisma ./prisma
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
 
-# Create non-root user
+# Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
 
-# Change ownership
-RUN chown -R nodejs:nodejs /app
-
-# Switch to non-root user
 USER nodejs
 
-# Expose port
 EXPOSE 5000
 
 # Health check
@@ -84,6 +74,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 
 # Start application
 CMD ["node", "dist/server.js"]
-
-
-
