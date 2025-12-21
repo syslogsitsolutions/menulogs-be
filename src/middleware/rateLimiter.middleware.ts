@@ -7,6 +7,10 @@ export const apiLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for OPTIONS requests (CORS preflight)
+    return req.method === 'OPTIONS';
+  },
 });
 
 // Auth rate limiter (stricter)

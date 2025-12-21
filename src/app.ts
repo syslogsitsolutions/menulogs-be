@@ -16,37 +16,10 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow cross-origin requests
 }));
 
-// CORS configuration - must be before other middleware
-// Allow multiple origins for dev and prod
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'http://localhost:5173',
-  'https://app.menulogs.in',
-  'https://app-dev.menulogs.in',
-].filter(Boolean); // Remove undefined values
-
+// CORS configuration - Allow all origins
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, Postman, curl)
-      if (!origin) return callback(null, true);
-      
-      // Normalize origin (remove trailing slash, convert to lowercase for comparison)
-      const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
-      const normalizedAllowed = allowedOrigins.map(o => o?.toLowerCase().replace(/\/$/, ''));
-      
-      if (normalizedAllowed.includes(normalizedOrigin)) {
-        callback(null, true);
-      } else {
-        // In production, be strict; in development, allow all
-        if (process.env.NODE_ENV === 'production') {
-          console.warn(`CORS blocked origin: ${origin}`);
-          callback(new Error('Not allowed by CORS'));
-        } else {
-          callback(null, true);
-        }
-      }
-    },
+    origin: true, // Allow all origins
     credentials: true, // Allow cookies to be sent
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
@@ -57,9 +30,13 @@ app.use(
       'Origin',
       'Access-Control-Request-Method',
       'Access-Control-Request-Headers',
+      'Cookie',
+      'Set-Cookie',
     ],
-    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range', 'Set-Cookie'],
     maxAge: 86400, // 24 hours - cache preflight requests
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 );
 
