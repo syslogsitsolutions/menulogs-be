@@ -6,7 +6,7 @@
  * @module services/upload
  */
 
-import s3, { S3_BUCKET } from '../config/s3';
+import s3, { S3_BUCKET, isS3Configured } from '../config/s3';
 import prisma from '../config/database';
 import { logger } from '../utils/logger.util';
 import { v4 as uuidv4 } from 'uuid';
@@ -36,7 +36,6 @@ export interface UploadFileResult {
  */
 export function generateS3Key(
   entityType: EntityType,
-  entityId: string,
   filename: string,
   mimeType: string,
   locationId?: string
@@ -50,11 +49,11 @@ export function generateS3Key(
 
   // If locationId is provided, include it as prefix
   if (locationId) {
-    return `${entityType}/${locationId}/${entityId}/${sanitizedFilename}-${timestamp}.${ext}`;
+    return `${entityType}/${locationId}/${sanitizedFilename}-${timestamp}.${ext}`;
   }
-  
+
   // For entities without location (e.g., business logo)
-  return `${entityType}/${entityId}/${sanitizedFilename}-${timestamp}.${ext}`;
+  return `${entityType}/${sanitizedFilename}-${timestamp}.${ext}`;
 }
 
 /**
@@ -65,15 +64,35 @@ export function generateS3Key(
 export async function uploadToS3(params: UploadFileParams): Promise<UploadFileResult> {
   const { file, entityType, entityId, userId, filename, locationId } = params;
 
+  // Check if S3 is configured
+  if (!isS3Configured()) {
+    const errorMessage = 'S3 is not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.';
+    logger.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+
   try {
-    // Generate S3 key
+    // Generate S3 key (should NOT include bucket name)
     const s3Key = generateS3Key(
       entityType,
-      entityId,
       filename || file.originalname || 'image',
       file.mimetype,
       locationId
     );
+
+    // Validate that the key doesn't accidentally include the bucket name
+    if (s3Key.startsWith(S3_BUCKET + '/') || s3Key.startsWith(S3_BUCKET)) {
+      logger.warn(`S3 key appears to include bucket name: ${s3Key}. This should not happen.`);
+    }
+
+    logger.info(`Attempting to upload file to S3`, {
+      bucket: S3_BUCKET,
+      key: s3Key,
+      entityType,
+      entityId,
+      fileSize: file.size,
+      fullPath: `${S3_BUCKET}/${s3Key}`,
+    });
 
     // Upload to S3
     // Note: ACLs are disabled on modern S3 buckets by default
@@ -112,6 +131,7 @@ export async function uploadToS3(params: UploadFileParams): Promise<UploadFileRe
       uploadId: upload.id,
       entityType,
       entityId,
+      url,
     });
 
     return {
@@ -120,8 +140,44 @@ export async function uploadToS3(params: UploadFileParams): Promise<UploadFileRe
       uploadId: upload.id,
     };
   } catch (error) {
-    logger.error('S3 upload error:', error);
-    throw new Error('Failed to upload file to S3');
+    // Log detailed error information
+    const errorDetails = {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      code: (error as any)?.code,
+      statusCode: (error as any)?.statusCode,
+      region: (error as any)?.region,
+      requestId: (error as any)?.requestId,
+      bucket: S3_BUCKET,
+      entityType,
+      entityId,
+    };
+
+    logger.error('S3 upload error:', {
+      ...errorDetails,
+      error: error instanceof Error ? error.stack : error,
+    });
+
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('NoSuchBucket')) {
+        throw new Error(`S3 bucket "${S3_BUCKET}" does not exist. Please check your AWS_S3_BUCKET environment variable.`);
+      }
+      if (error.message.includes('InvalidAccessKeyId') || error.message.includes('SignatureDoesNotMatch')) {
+        throw new Error('Invalid AWS credentials. Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.');
+      }
+      if (error.message.includes('AccessDenied')) {
+        throw new Error(`Access denied to S3 bucket "${S3_BUCKET}". Please check your AWS credentials and bucket permissions.`);
+      }
+      if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
+        throw new Error(`Cannot connect to S3. Please check your network connection and AWS_REGION (currently: ${process.env.AWS_REGION || 'ap-south-1'}).`);
+      }
+      if (error.message.includes("does not match certificate's altnames") || error.message.includes('Hostname/IP does not match')) {
+        throw new Error(`S3 hostname certificate mismatch. This usually happens with virtual-hosted style URLs. Path-style addressing is now enabled by default. If the issue persists, verify your AWS_S3_BUCKET name is correct: "${S3_BUCKET}".`);
+      }
+      throw new Error(`Failed to upload file to S3: ${error.message}`);
+    }
+
+    throw new Error('Failed to upload file to S3: Unknown error occurred');
   }
 }
 

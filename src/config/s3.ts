@@ -5,9 +5,19 @@ const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID;
 const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
 const AWS_REGION = process.env.AWS_REGION || 'ap-south-1';
 const AWS_S3_ENDPOINT = process.env.AWS_S3_ENDPOINT;
-const AWS_S3_FORCE_PATH_STYLE = process.env.AWS_S3_FORCE_PATH_STYLE === 'true';
+// Default to path-style addressing to avoid DNS/certificate issues
+// Set AWS_S3_FORCE_PATH_STYLE=false to use virtual-hosted style
+const AWS_S3_FORCE_PATH_STYLE = process.env.AWS_S3_FORCE_PATH_STYLE !== 'false';
 
-export const S3_BUCKET = process.env.AWS_S3_BUCKET || 'menulogs-dev';
+// Get bucket name from environment, ensuring it doesn't contain paths
+const rawBucketName = process.env.AWS_S3_BUCKET || 'menulogs-dev';
+// Remove any leading/trailing slashes and paths - bucket name should be just the name
+export const S3_BUCKET = rawBucketName.split('/')[0].trim();
+
+// Warn if bucket name appears to contain a path
+if (rawBucketName !== S3_BUCKET) {
+  logger.warn(`AWS_S3_BUCKET appears to contain a path: "${rawBucketName}". Using bucket name only: "${S3_BUCKET}"`);
+}
 
 // Check if S3 is configured
 export const isS3Configured = (): boolean => {
@@ -15,10 +25,11 @@ export const isS3Configured = (): boolean => {
 };
 
 // Initialize S3 only if credentials are provided
+// Use path-style addressing by default to avoid DNS/certificate issues with bucket names
 const s3Config: AWS.S3.Types.ClientConfiguration = {
   region: AWS_REGION,
+  s3ForcePathStyle: AWS_S3_FORCE_PATH_STYLE, // Defaults to true to avoid hostname/certificate issues
   ...(AWS_S3_ENDPOINT && { endpoint: AWS_S3_ENDPOINT }),
-  ...(AWS_S3_FORCE_PATH_STYLE && { s3ForcePathStyle: true }),
 };
 
 if (AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
