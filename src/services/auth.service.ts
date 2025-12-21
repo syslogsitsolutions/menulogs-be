@@ -6,6 +6,7 @@ import {
   verifyRefreshToken,
   getTokenExpiryDate,
 } from '../utils/jwt.util';
+import emailService from './email.service';
 import * as crypto from 'crypto';
 
 export class AuthService {
@@ -56,6 +57,15 @@ export class AuthService {
         refreshToken,
         expiresAt: getTokenExpiryDate(7),
       },
+    });
+
+    // Send welcome email (non-blocking)
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const dashboardLink = `${frontendUrl}/dashboard`;
+    
+    emailService.sendWelcomeEmail(user.email, user.name, dashboardLink).catch((error) => {
+      console.error('[Email Error] Failed to send welcome email:', error);
+      // Don't throw - email failure shouldn't block signup
     });
 
     return {
@@ -260,15 +270,22 @@ export class AuthService {
       },
     });
 
-    // TODO: In production, send email with reset link
-    // For now, return the token (only for development/testing)
+    // Send password reset email
     const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
     
-    console.log(`[Password Reset] Token for ${email}: ${token}`);
-    console.log(`[Password Reset] Reset link: ${resetLink}`);
+    emailService.sendPasswordResetEmail(user.email, user.name, resetLink).catch((error) => {
+      console.error('[Email Error] Failed to send password reset email:', error);
+      // Log error but don't throw - don't reveal if user exists
+    });
+
+    // In development, also log the reset link for testing
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Password Reset] Token for ${email}: ${token}`);
+      console.log(`[Password Reset] Reset link: ${resetLink}`);
+    }
 
     return {
-      token, // Only return in development - remove in production
+      token: process.env.NODE_ENV === 'development' ? token : '', // Only return token in development
       message: 'If an account with that email exists, a password reset link has been sent.',
     };
   }

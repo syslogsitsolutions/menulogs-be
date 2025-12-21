@@ -176,6 +176,24 @@ RAZORPAY_KEY_SECRET=your-secret
 RAZORPAY_WEBHOOK_SECRET=your-webhook-secret
 RAZORPAY_CURRENCY=INR
 
+# Email Configuration (Zoho/ZeptoMail)
+EMAIL_PROVIDER=zeptomail
+EMAIL_FROM=noreply@menulogs.com
+EMAIL_FROM_NAME=MenuLogs
+EMAIL_REPLY_TO=support@menulogs.com
+
+# ZeptoMail API Token (Recommended for transactional emails)
+# Get token from: ZeptoMail Dashboard → Mail Agents → SMTP & API Info → API Tab → Send Mail Token
+ZEPTOMAIL_API_TOKEN=your-send-mail-token-here
+ZEPTOMAIL_BOUNCE_ADDRESS=bounce@menulogs.in
+
+# SMTP Configuration (Alternative - if not using ZeptoMail)
+# SMTP_HOST=smtp.zoho.com
+# SMTP_PORT=587
+# SMTP_SECURE=false
+# SMTP_USER=noreply@menulogs.com
+# SMTP_PASS=your-app-password
+
 # Logging (Optional)
 LOG_LEVEL=info
 LOG_DIR=logs

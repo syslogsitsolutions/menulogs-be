@@ -1,0 +1,29 @@
+/**
+ * Subscription Activated Email Template
+ */
+
+export function getSubscriptionActivatedTemplate(
+  userName: string,
+  planName: string,
+  billingCycle: string,
+  nextBillingDate: string,
+  dashboardLink: string
+): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"></head>
+    <body style="font-family: Arial, sans-serif; padding: 20px; background-color: #f5f5f5;">
+      <div style="max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px;">
+        <h1 style="color: #1a472a;">Subscription Activated! 🎉</h1>
+        <p>Congratulations, ${userName}!</p>
+        <p>Your ${planName} subscription is now active.</p>
+        <p><strong>Billing Cycle:</strong> ${billingCycle}</p>
+        <p><strong>Next Billing Date:</strong> ${nextBillingDate}</p>
+        <a href="${dashboardLink}" style="display: inline-block; padding: 12px 24px; background: #1a472a; color: white; text-decoration: none; border-radius: 6px;">Go to Dashboard</a>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
