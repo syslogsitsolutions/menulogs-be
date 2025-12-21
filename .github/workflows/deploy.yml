@@ -86,6 +86,10 @@ jobs:
             # Pull latest image
             docker-compose pull backend
             
+            # Regenerate Prisma Client (needed after Prisma 7 upgrade)
+            echo "🔄 Regenerating Prisma Client..."
+            docker-compose run --rm -e PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 backend npx prisma generate
+            
             # Run database migrations BEFORE restarting
             # This ensures migrations are applied before the new code runs
             echo "🔄 Running database migrations..."
