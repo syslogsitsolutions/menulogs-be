@@ -8,6 +8,7 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
+COPY prisma.config.js ./prisma.config.js
 
 # Install all dependencies (including dev dependencies for build)
 RUN if [ -f package-lock.json ]; then \
@@ -49,12 +50,13 @@ RUN if [ -f package-lock.json ]; then \
 # Install Prisma CLI (needed for migrations, but not for generating client)
 # Prisma Client is copied from builder stage
 # Using --no-save to avoid modifying package.json
-RUN npm install prisma@^6.1.0 --legacy-peer-deps --no-save
+RUN npm install prisma@^7.2.0 --legacy-peer-deps --no-save
 
 # Copy Prisma Client from builder (includes generated client and binaries)
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.js ./prisma.config.js
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
