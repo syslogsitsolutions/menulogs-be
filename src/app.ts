@@ -15,6 +15,7 @@ const app: Application = express();
 // Explicitly allow frontend origins
 const allowedOrigins = [
   'https://app.menulogs.in',
+  'https://menulogs.in',
   'https://app-dev.menulogs.in',
   'http://localhost:5173',
   'http://localhost:3000',
