@@ -133,7 +133,18 @@ model Location {
   mapEmbedUrl    String?
 
   // Brand customization
-  brandColor     String?  @default("#ee6620")
+  brandColor String? @default("#ee6620")
+
+  // Usage tracking fields
+  currentMenuItems        Int       @default(0)
+  currentCategories       Int       @default(0)
+  currentBanners          Int       @default(0)
+  currentFeaturedSections Int       @default(0)
+  currentStorageBytes     BigInt    @default(0)
+  monthlyImageUploads     Int       @default(0)
+  monthlyVideoUploads     Int       @default(0)
+  monthlyUploadResetDate  DateTime?
+  lastUsageUpdate         DateTime?
 
   // Relations
   business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -147,6 +158,7 @@ model Location {
   @@index([businessId])
   @@index([subscriptionStatus])
   @@index([slug])
+  @@index([trialEndsAt])
   @@map("locations")
 }
 
@@ -159,10 +171,10 @@ enum SubscriptionStatus {
 }
 
 enum SubscriptionPlan {
-  FREE
-  STARTER
+  FREE // Trial period
+  STANDARD
   PROFESSIONAL
-  ENTERPRISE
+  CUSTOM
 }
 
 // ==================== MENU CONTENT ====================
@@ -292,12 +304,29 @@ model Subscription {
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
 
+  // Feature flags
+  teamMemberLimit     Int     @default(2)
+  customDomainEnabled Boolean @default(false)
+  apiAccessEnabled    Boolean @default(false)
+  whiteLabelEnabled   Boolean @default(false)
+  ssoEnabled          Boolean @default(false)
+
+  // Grace period and payment retry
+  gracePeriodEndsAt  DateTime?
+  gracePeriodStatus  String? // 'ACTIVE' | 'EXPIRED'
+  lastPaymentAttempt DateTime?
+  paymentRetryCount  Int       @default(0)
+  dunningStatus      String? // 'RETRY_1' | 'RETRY_2' | 'RETRY_3' | 'FINAL_NOTICE'
+
   // Relations
   location Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
   invoices Invoice[]
 
   @@index([locationId])
   @@index([status])
+  @@index([endDate])
+  @@index([nextBillingDate])
+  @@index([gracePeriodEndsAt])
   @@map("subscriptions")
 }
 
