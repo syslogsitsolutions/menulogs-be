@@ -10,6 +10,8 @@ import { clearLocationCache } from '../utils/cache.util';
 import { uploadToS3, deleteFromS3, extractS3KeyFromUrl } from '../services/upload.service';
 import { validateImageFile, processImage } from '../utils/image.util';
 import { logger } from '../utils/logger.util';
+import usageTrackingService from '../services/usageTracking.service';
+import { serializeLocation, serializeLocations } from '../utils/serialization.util';
 
 const locationSchema = z.object({
   name: z.string().min(2),
@@ -58,7 +60,7 @@ export class LocationController {
         orderBy: { createdAt: 'desc' },
       });
 
-      res.json({ locations });
+      res.json({ locations: serializeLocations(locations) });
     } catch (error) {
       next(error);
     }
@@ -151,9 +153,15 @@ export class LocationController {
         slug = await generateUniqueSlug(`${data.name}-${data.city}`);
       }
 
-      // Set trial period
+      // Set trial period (14 days)
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
+      // Set monthly upload reset date to next month
+      const monthlyUploadResetDate = new Date();
+      monthlyUploadResetDate.setMonth(monthlyUploadResetDate.getMonth() + 1);
+      monthlyUploadResetDate.setDate(1);
+      monthlyUploadResetDate.setHours(0, 0, 0, 0);
 
       const location = await prisma.location.create({
         data: {
@@ -174,6 +182,19 @@ export class LocationController {
           brandColor: data.brandColor || undefined,
           businessId,
           trialEndsAt,
+          // Initialize subscription (FREE plan with trial)
+          subscriptionPlan: 'FREE',
+          subscriptionStatus: 'TRIAL',
+          // Initialize usage counters
+          currentMenuItems: 0,
+          currentCategories: 0,
+          currentBanners: 0,
+          currentFeaturedSections: 0,
+          currentStorageBytes: BigInt(0),
+          monthlyImageUploads: 0,
+          monthlyVideoUploads: 0,
+          monthlyUploadResetDate,
+          lastUsageUpdate: new Date(),
         },
       });
 
@@ -196,7 +217,7 @@ export class LocationController {
 
       res.status(201).json({
         message: 'Location created successfully',
-        location,
+        location: serializeLocation(location),
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -229,7 +250,18 @@ export class LocationController {
         return;
       }
 
-      res.json({ location });
+      // Get usage summary for location
+      let usageSummary;
+      try {
+        usageSummary = await usageTrackingService.getUsageSummary(location.id);
+      } catch (error) {
+        logger.warn('Failed to get usage summary:', error);
+      }
+
+      res.json({
+        location: serializeLocation(location),
+        usage: usageSummary,
+      });
     } catch (error) {
       next(error);
     }

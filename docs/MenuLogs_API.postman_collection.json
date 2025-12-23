@@ -1906,6 +1906,70 @@
 					"response": []
 				},
 				{
+					"name": "Get Plan Features (NEW)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/features/:plan",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions",
+								"features",
+								":plan"
+							],
+							"variable": [
+								{
+									"key": "plan",
+									"value": "STANDARD",
+									"description": "Plan name (FREE, STANDARD, PROFESSIONAL, CUSTOM)"
+								}
+							]
+						},
+						"description": "Get all features available for a specific subscription plan.\n\n**No authentication required** - This is a public endpoint.\n\n**Response includes:**\n- List of available features\n- Plan details (name, description, pricing)\n\n**Use cases:**\n- Display features on pricing page\n- Compare plans\n- Show upgrade benefits"
+					},
+					"response": []
+				},
+				{
+					"name": "Check Feature Access (NEW)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/subscriptions/check-feature/:plan/:feature",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"subscriptions",
+								"check-feature",
+								":plan",
+								":feature"
+							],
+							"variable": [
+								{
+									"key": "plan",
+									"value": "STANDARD",
+									"description": "Plan name (FREE, STANDARD, PROFESSIONAL, CUSTOM)"
+								},
+								{
+									"key": "feature",
+									"value": "customDomain",
+									"description": "Feature name (e.g., customDomain, apiAccess, whiteLabel, sso)"
+								}
+							]
+						},
+						"description": "Check if a specific plan has access to a feature.\n\n**No authentication required** - This is a public endpoint.\n\n**Response includes:**\n- Whether the plan has the feature\n- Upgrade recommendation (if feature not available)\n\n**Use cases:**\n- Feature gating in frontend\n- Show upgrade prompts\n- Conditional feature display"
+					},
+					"response": []
+				},
+				{
 					"name": "Get Subscription",
 					"request": {
 						"auth": {
@@ -2001,7 +2065,7 @@
 								"subscriptions"
 							]
 						},
-						"description": "Create a new subscription for a location.\n\n**Plans:**\n- `FREE` - $0/month (1 location, 20 items, 0 banners)\n- `STARTER` - $29/month (3 locations, 100 items, 5 banners)\n- `PROFESSIONAL` - $79/month (10 locations, 500 items, 20 banners)\n- `ENTERPRISE` - $199/month (unlimited everything)\n\n**Billing Cycles:**\n- `MONTHLY` - Standard monthly billing\n- `YEARLY` - 15% discount (billed annually)\n\n**Note:** Paid plans start with 14-day free trial."
+						"description": "Create a new subscription for a location.\n\n**Plans (Per Location):**\n- `FREE` - ₹0/month - Free trial (20 menu items, 5 categories, 0 banners)\n- `STANDARD` - ₹499/month (₹4,990/year) - 100 menu items, 20 categories, 5 banners, 2GB storage\n- `PROFESSIONAL` - ₹1,499/month (₹14,990/year) - 500 menu items, 50 categories, 20 banners, 10GB storage, custom domain, API access\n- `CUSTOM` - Custom pricing - Unlimited everything, white label, SSO, dedicated support\n\n**Billing Cycles:**\n- `MONTHLY` - Standard monthly billing\n- `YEARLY` - 17% discount (billed annually)\n\n**Note:** All new locations get 14-day free trial. Subscription is per location - businesses can have unlimited locations."
 					},
 					"response": []
 				},
@@ -2045,7 +2109,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"plan\": \"ENTERPRISE\",\n    \"billingCycle\": \"YEARLY\"\n}"
+							"raw": "{\n    \"plan\": \"PROFESSIONAL\",\n    \"billingCycle\": \"YEARLY\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/subscriptions/:id/change-plan",
@@ -2067,7 +2131,7 @@
 								}
 							]
 						},
-						"description": "Change subscription plan or billing cycle.\n\n**Body:**\n- `plan` (required): New plan (FREE, STARTER, PROFESSIONAL, ENTERPRISE)\n- `billingCycle` (optional): MONTHLY or YEARLY\n\n**Notes:**\n- Upgrading takes effect immediately\n- Downgrading to FREE removes paid features\n- Billing is prorated"
+						"description": "Change subscription plan or billing cycle.\n\n**Body:**\n- `plan` (required): New plan (FREE, STANDARD, PROFESSIONAL, CUSTOM)\n- `billingCycle` (optional): MONTHLY or YEARLY\n\n**Notes:**\n- Upgrading takes effect immediately with prorated billing\n- Downgrading takes effect at next billing cycle\n- Downgrading to FREE removes paid features\n- Feature flags are automatically updated based on plan"
 					},
 					"response": []
 				},
@@ -2382,7 +2446,7 @@
 					"response": []
 				}
 			],
-			"description": "Subscription and payment management endpoints. Manage subscription plans, billing, and Razorpay integration.\n\n**Pricing Plans:**\n- FREE: $0/month (1 location, 20 items, 0 banners)\n- STARTER: $29/month (3 locations, 100 items, 5 banners)\n- PROFESSIONAL: $79/month (10 locations, 500 items, 20 banners)\n- ENTERPRISE: $199/month (unlimited everything)\n\n**Billing:**\n- Monthly or Yearly (15% discount on yearly)\n- 14-day free trial for paid plans\n- Automatic invoice generation"
+			"description": "Subscription and payment management endpoints. Manage subscription plans, billing, and Razorpay integration.\n\n**Pricing Plans (Per Location):**\n- FREE: ₹0/month - Free trial (20 menu items, 5 categories, 0 banners)\n- STANDARD: ₹499/month (₹4,990/year) - 100 menu items, 20 categories, 5 banners, 2GB storage\n- PROFESSIONAL: ₹1,499/month (₹14,990/year) - 500 menu items, 50 categories, 20 banners, 10GB storage, custom domain, API access\n- CUSTOM: Custom pricing - Unlimited everything, white label, SSO, dedicated support\n\n**Billing:**\n- Monthly or Yearly (17% discount on yearly)\n- 14-day free trial for all new locations\n- Automatic invoice generation\n- Per-location subscription model (unlimited locations per business)\n\n**New Endpoints:**\n- GET `/subscriptions/features/:plan` - Get features for a plan\n- GET `/subscriptions/check-feature/:plan/:feature` - Check if plan has feature"
 		}
 	],
 	"event": [

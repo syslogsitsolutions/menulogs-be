@@ -5,6 +5,7 @@ import { uploadToS3, deleteFromS3, extractS3KeyFromUrl } from '../services/uploa
 import { validateImageFile, processImage } from '../utils/image.util';
 import { logger } from '../utils/logger.util';
 import { clearFeaturedSectionCache } from '../utils/cache.util';
+import usageTrackingService from '../services/usageTracking.service';
 
 const featureSchema = z.object({
   title: z.string().min(1),
@@ -141,6 +142,9 @@ export class FeaturedSectionController {
 
         for (const loc of allLocations) {
           try {
+            // Note: Usage limit is checked by middleware per location
+            // We only track usage after successful creation
+
             const maxOrder = await prisma.featuredSection.findFirst({
               where: { locationId: loc.id },
               orderBy: { sortOrder: 'desc' },
@@ -156,6 +160,15 @@ export class FeaturedSectionController {
             });
 
             createdSections.push(section);
+
+            // Track usage after successful creation
+            await usageTrackingService.trackFeaturedSectionCreation(loc.id);
+
+            // Track storage usage if image was uploaded
+            // Note: Storage limit is checked by middleware, we only track here
+            if (file) {
+              await usageTrackingService.trackStorageUsage(loc.id, file.size);
+            }
 
             // Clear cache for this location
             await clearFeaturedSectionCache(loc.id, loc.slug);
@@ -188,6 +201,9 @@ export class FeaturedSectionController {
           errors: errors.length > 0 ? errors : undefined,
         });
       } else {
+        // Note: Usage limit is checked by middleware (checkPlanLimit)
+        // We only track usage after successful creation
+
         // Create for single location
         const maxOrder = await prisma.featuredSection.findFirst({
           where: { locationId },
@@ -202,6 +218,15 @@ export class FeaturedSectionController {
             sortOrder: (maxOrder?.sortOrder || 0) + 1,
           },
         });
+
+        // Track usage after successful creation
+        await usageTrackingService.trackFeaturedSectionCreation(locationId);
+
+        // Track storage usage if image was uploaded
+        // Note: Storage limit is checked by middleware, we only track here
+        if (file) {
+          await usageTrackingService.trackStorageUsage(locationId, file.size);
+        }
 
         // Update upload record with correct entityId if file was uploaded
         if (file && imageUrl) {
@@ -382,6 +407,9 @@ export class FeaturedSectionController {
       });
 
       await prisma.featuredSection.delete({ where: { id } });
+
+      // Track deletion - decrement usage counter
+      await usageTrackingService.trackFeaturedSectionDeletion(locationId);
 
       // Clear menu cache for this location
       await clearFeaturedSectionCache(locationId, location?.slug);

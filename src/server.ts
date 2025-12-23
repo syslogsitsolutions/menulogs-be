@@ -5,6 +5,9 @@ import app from './app';
 import prisma from './config/database';
 import redis from './config/redis';
 import logger from './utils/logger.util';
+import { initializeMonthlyUsageResetJob } from './jobs/monthlyUsageReset.job';
+import { initializeSubscriptionExpiryJob } from './jobs/subscriptionExpiry.job';
+import { initializeTrialExpiryJob } from './jobs/trialExpiry.job';
 
 const PORT = process.env.PORT || 5000;
 
@@ -17,6 +20,11 @@ const startServer = async () => {
     // Test Redis connection
     await redis.ping();
     logger.info('✅ Redis connected');
+
+    // Initialize scheduled jobs
+    initializeMonthlyUsageResetJob();
+    initializeSubscriptionExpiryJob();
+    initializeTrialExpiryJob();
 
     // Start server
     app.listen(PORT, () => {

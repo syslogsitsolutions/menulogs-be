@@ -12,12 +12,13 @@ import { z } from 'zod';
 import razorpay, { verifyPaymentSignature, getRazorpayKeyId } from '../config/razorpay';
 import prisma from '../config/database';
 import { logger } from '../utils/logger.util';
+import subscriptionService from '../services/subscription.service';
 
 // ==================== VALIDATION SCHEMAS ====================
 
 const createOrderSchema = z.object({
   locationId: z.string().uuid('Invalid location ID'),
-  plan: z.enum(['STARTER', 'PROFESSIONAL', 'ENTERPRISE'], {
+  plan: z.enum(['STANDARD', 'PROFESSIONAL', 'CUSTOM'], {
     errorMap: () => ({ message: 'Invalid subscription plan' }),
   }),
   billingCycle: z.enum(['MONTHLY', 'YEARLY']).default('MONTHLY'),
@@ -28,7 +29,7 @@ const verifyPaymentSchema = z.object({
   razorpay_payment_id: z.string().min(1, 'Payment ID is required'),
   razorpay_signature: z.string().min(1, 'Signature is required'),
   locationId: z.string().uuid('Invalid location ID'),
-  plan: z.enum(['STARTER', 'PROFESSIONAL', 'ENTERPRISE']),
+  plan: z.enum(['STANDARD', 'PROFESSIONAL', 'CUSTOM']),
   billingCycle: z.enum(['MONTHLY', 'YEARLY']),
 });
 
@@ -39,19 +40,22 @@ const refundPaymentSchema = z.object({
 });
 
 // ==================== PRICING CONFIGURATION ====================
+// Prices in paise (smallest currency unit)
+// Note: CUSTOM plan pricing is handled separately (contact sales)
 
 const PRICING_PLANS = {
-  STARTER: {
-    monthly: 29900, // in paise (299.00 INR or $29.90)
-    yearly: 305150, // 15% discount (3051.50 INR or $305.15)
+  STANDARD: {
+    monthly: 49900, // in paise (₹499.00 or $5.00)
+    yearly: 499000, // in paise (₹4,990.00 or $50.00) - 17% discount
   },
   PROFESSIONAL: {
-    monthly: 79900, // in paise (799.00 INR or $79.90)
-    yearly: 814915, // 15% discount
+    monthly: 149900, // in paise (₹1,499.00 or $15.00)
+    yearly: 1499000, // in paise (₹14,990.00 or $150.00) - 17% discount
   },
-  ENTERPRISE: {
-    monthly: 199900, // in paise (1999.00 INR or $199.90)
-    yearly: 2038915, // 15% discount
+  CUSTOM: {
+    monthly: 499900, // in paise (₹4,999.00 or $50.00) - starting price
+    yearly: 4999000, // in paise (₹49,990.00 or $500.00) - starting price with discount
+    // Note: CUSTOM plan pricing is typically negotiated per customer
   },
 };
 
@@ -129,8 +133,27 @@ export class PaymentController {
         return;
       }
 
+      // Handle CUSTOM plan - redirect to contact sales
+      if (data.plan === 'CUSTOM') {
+        res.status(400).json({
+          error: 'Custom plan requires sales contact',
+          message: 'Please contact our sales team for custom pricing',
+          contactUrl: `${process.env.FRONTEND_URL}/contact?plan=CUSTOM&locationId=${data.locationId}`,
+          salesEmail: process.env.SALES_EMAIL || 'sales@menulogs.com',
+        });
+        return;
+      }
+
       // Calculate amount based on plan and billing cycle
       const planPricing = PRICING_PLANS[data.plan];
+      if (!planPricing) {
+        res.status(400).json({
+          error: 'Invalid plan',
+          message: `Plan ${data.plan} is not available`,
+        });
+        return;
+      }
+
       const amount = data.billingCycle === 'YEARLY' ? planPricing.yearly : planPricing.monthly;
       const currency = process.env.RAZORPAY_CURRENCY || 'INR';
 
@@ -273,13 +296,16 @@ export class PaymentController {
         nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
       }
 
+      // Get feature flags for the plan
+      const featureFlags = subscriptionService.getFeatureFlagsForPlan(data.plan);
+
       // Create or update subscription
       const paymentAmount = typeof payment.amount === 'number' ? payment.amount : Number(payment.amount);
       const subscription = await prisma.subscription.upsert({
         where: { locationId: data.locationId },
         create: {
           locationId: data.locationId,
-          plan: data.plan,
+          plan: data.plan as any, // Type assertion needed until Prisma client is regenerated
           status: 'ACTIVE',
           billingCycle: data.billingCycle,
           price: paymentAmount / 100, // Convert paise to rupees
@@ -287,9 +313,15 @@ export class PaymentController {
           startDate,
           endDate,
           nextBillingDate,
+          // Feature flags
+          teamMemberLimit: featureFlags.teamMemberLimit,
+          customDomainEnabled: featureFlags.customDomainEnabled,
+          apiAccessEnabled: featureFlags.apiAccessEnabled,
+          whiteLabelEnabled: featureFlags.whiteLabelEnabled,
+          ssoEnabled: featureFlags.ssoEnabled,
         },
         update: {
-          plan: data.plan,
+          plan: data.plan as any, // Type assertion needed until Prisma client is regenerated
           status: 'ACTIVE',
           billingCycle: data.billingCycle,
           price: paymentAmount / 100,
@@ -297,16 +329,31 @@ export class PaymentController {
           startDate,
           endDate,
           nextBillingDate,
+          // Update feature flags
+          teamMemberLimit: featureFlags.teamMemberLimit,
+          customDomainEnabled: featureFlags.customDomainEnabled,
+          apiAccessEnabled: featureFlags.apiAccessEnabled,
+          whiteLabelEnabled: featureFlags.whiteLabelEnabled,
+          ssoEnabled: featureFlags.ssoEnabled,
         },
       });
 
-      // Update location status
+      // Update location status and initialize usage tracking
+      const nextMonth = new Date();
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      nextMonth.setDate(1);
+      nextMonth.setHours(0, 0, 0, 0);
+
       await prisma.location.update({
         where: { id: data.locationId },
         data: {
-          subscriptionPlan: data.plan,
+          subscriptionPlan: data.plan as any, // Type assertion needed until Prisma client is regenerated
           subscriptionStatus: 'ACTIVE',
           trialEndsAt: null,
+          // Initialize monthly upload reset date if not set
+          monthlyUploadResetDate: {
+            set: nextMonth,
+          },
         },
       });
 

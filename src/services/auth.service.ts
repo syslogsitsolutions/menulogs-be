@@ -7,6 +7,7 @@ import {
   getTokenExpiryDate,
 } from '../utils/jwt.util';
 import emailService from './email.service';
+import { serializeLocations } from '../utils/serialization.util';
 import * as crypto from 'crypto';
 
 export class AuthService {
@@ -121,6 +122,12 @@ export class AuthService {
       },
     });
 
+    // Serialize locations to convert BigInt to strings
+    const serializedBusinesses = businesses.map((business) => ({
+      ...business,
+      locations: serializeLocations(business.locations),
+    }));
+
     return {
       user: {
         id: user.id,
@@ -128,8 +135,8 @@ export class AuthService {
         email: user.email,
         role: user.role,
       },
-      business: businesses[0] || null,
-      locations: businesses[0]?.locations || [],
+      business: serializedBusinesses[0] || null,
+      locations: serializedBusinesses[0]?.locations || [],
       accessToken,
       refreshToken,
     };
@@ -223,10 +230,16 @@ export class AuthService {
       },
     });
 
+    // Serialize locations to convert BigInt to strings
+    const serializedBusinesses = businesses.map((business) => ({
+      ...business,
+      locations: serializeLocations(business.locations),
+    }));
+
     return {
       user,
-      business: businesses[0] || null,
-      locations: businesses[0]?.locations || [],
+      business: serializedBusinesses[0] || null,
+      locations: serializedBusinesses[0]?.locations || [],
     };
   }
 

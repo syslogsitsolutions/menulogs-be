@@ -4,8 +4,10 @@ import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Public route - get pricing plans
+// Public routes
 router.get('/plans', subscriptionController.getPlans.bind(subscriptionController));
+router.get('/features/:plan', subscriptionController.getFeatures.bind(subscriptionController));
+router.get('/check-feature/:plan/:feature', subscriptionController.checkFeatureAccess.bind(subscriptionController));
 
 // Webhook - no auth (verified by signature)
 router.post('/webhook', subscriptionController.handleWebhook.bind(subscriptionController));

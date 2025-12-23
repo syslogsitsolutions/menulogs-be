@@ -5,6 +5,7 @@ import { uploadToS3, deleteFromS3, extractS3KeyFromUrl } from '../services/uploa
 import { validateImageFile, processImage } from '../utils/image.util';
 import { logger } from '../utils/logger.util';
 import { clearMenuCache } from '../utils/cache.util';
+import usageTrackingService from '../services/usageTracking.service';
 
 const bannerSchema = z.object({
   title: z.string().min(2),
@@ -97,6 +98,9 @@ export class BannerController {
         return;
       }
 
+      // Note: Usage limit is checked by middleware (checkPlanLimit)
+      // We only track usage after successful creation
+
       const maxOrder = await prisma.banner.findFirst({
         where: { locationId },
         orderBy: { sortOrder: 'desc' },
@@ -120,6 +124,11 @@ export class BannerController {
           sortOrder: (maxOrder?.sortOrder || 0) + 1,
         },
       });
+
+      // Track storage usage if image was uploaded
+      if (file) {
+        await usageTrackingService.trackStorageUsage(locationId, file.size);
+      }
 
       // Update upload record with correct entityId if file was uploaded
       if (file && imageUrl) {
@@ -287,6 +296,9 @@ export class BannerController {
       });
 
       await prisma.banner.delete({ where: { id } });
+
+      // Track deletion - decrement usage counter
+      await usageTrackingService.trackBannerDeletion(locationId);
 
       // Clear menu cache for this location
       await clearMenuCache(locationId, location?.slug);

@@ -17,6 +17,7 @@ import {
 import { validateImageFile, processImage } from '../utils/image.util';
 import { logger } from '../utils/logger.util';
 import prisma from '../config/database';
+import usageTrackingService from '../services/usageTracking.service';
 
 export class UploadController {
   /**
@@ -79,6 +80,45 @@ export class UploadController {
         userId,
         filename,
       });
+
+      // Track storage and monthly upload usage after successful upload
+      // Note: Limits are checked by middleware, we only track here
+      // Get locationId from entity if it's a location-related entity
+      if (entityType === 'menu-item' || entityType === 'category' || entityType === 'banner') {
+        // Try to get locationId from entity
+        let locationId: string | null = null;
+        try {
+          if (entityType === 'menu-item') {
+            const menuItem = await prisma.menuItem.findUnique({
+              where: { id: entityId },
+              select: { locationId: true },
+            });
+            locationId = menuItem?.locationId || null;
+          } else if (entityType === 'category') {
+            const category = await prisma.category.findUnique({
+              where: { id: entityId },
+              select: { locationId: true },
+            });
+            locationId = category?.locationId || null;
+          } else if (entityType === 'banner') {
+            const banner = await prisma.banner.findUnique({
+              where: { id: entityId },
+              select: { locationId: true },
+            });
+            locationId = banner?.locationId || null;
+          }
+
+          if (locationId) {
+            // Track storage usage
+            await usageTrackingService.trackStorageUsage(locationId, processedFile.size);
+            // Track monthly image upload
+            await usageTrackingService.trackImageUpload(locationId);
+          }
+        } catch (error) {
+          // Log but don't fail the upload if tracking fails
+          logger.warn('Failed to track upload usage:', error);
+        }
+      }
 
       res.status(200).json({
         message: 'File uploaded successfully',
@@ -159,6 +199,47 @@ export class UploadController {
       });
 
       const results = await Promise.all(uploadPromises);
+
+      // Track storage and monthly upload usage after successful uploads
+      // Note: Limits are checked by middleware, we only track here
+      if (entityType === 'menu-item' || entityType === 'category' || entityType === 'banner') {
+        // Try to get locationId from entity
+        let locationId: string | null = null;
+        try {
+          if (entityType === 'menu-item') {
+            const menuItem = await prisma.menuItem.findUnique({
+              where: { id: entityId },
+              select: { locationId: true },
+            });
+            locationId = menuItem?.locationId || null;
+          } else if (entityType === 'category') {
+            const category = await prisma.category.findUnique({
+              where: { id: entityId },
+              select: { locationId: true },
+            });
+            locationId = category?.locationId || null;
+          } else if (entityType === 'banner') {
+            const banner = await prisma.banner.findUnique({
+              where: { id: entityId },
+              select: { locationId: true },
+            });
+            locationId = banner?.locationId || null;
+          }
+
+          if (locationId) {
+            // Track storage usage for all files
+            const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+            await usageTrackingService.trackStorageUsage(locationId, totalBytes);
+            // Track monthly image uploads (one per file)
+            for (const _file of files) {
+              await usageTrackingService.trackImageUpload(locationId);
+            }
+          }
+        } catch (error) {
+          // Log but don't fail the upload if tracking fails
+          logger.warn('Failed to track upload usage:', error);
+        }
+      }
 
       res.status(200).json({
         message: `${results.length} file(s) uploaded successfully`,

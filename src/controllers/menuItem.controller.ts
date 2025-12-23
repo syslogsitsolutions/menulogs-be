@@ -5,6 +5,7 @@ import { uploadToS3, deleteMultipleFromS3, extractS3KeyFromUrl } from '../servic
 import { validateImageFile, processImage } from '../utils/image.util';
 import { logger } from '../utils/logger.util';
 import { clearMenuCache } from '../utils/cache.util';
+import usageTrackingService from '../services/usageTracking.service';
 
 // Helper to validate image string (URL or base64 data URL)
 const imageString = z.string().refine(
@@ -248,6 +249,9 @@ export class MenuItemController {
         images,
       };
 
+      // Note: Usage limit is checked by middleware (checkPlanLimit)
+      // We only track usage after successful creation
+
       const maxOrder = await prisma.menuItem.findFirst({
         where: { locationId },
         orderBy: { sortOrder: 'desc' },
@@ -262,6 +266,16 @@ export class MenuItemController {
         },
         include: { category: true },
       });
+
+      // Track usage after successful creation
+      await usageTrackingService.trackMenuItemCreation(locationId);
+
+      // Track storage usage if images were uploaded
+      // Note: Storage limit is checked by middleware, we only track here
+      if (files && files.length > 0) {
+        const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+        await usageTrackingService.trackStorageUsage(locationId, totalBytes);
+      }
 
       // Update upload records with correct entityId if files were uploaded
       if (files && imageUrls && imageUrls.length > 0) {
@@ -582,6 +596,16 @@ export class MenuItemController {
       });
 
       await prisma.menuItem.delete({ where: { id } });
+
+      // Track deletion - decrement usage counter
+      await usageTrackingService.trackMenuItemDeletion(locationId);
+
+      // Track storage deletion if images existed
+      if (allImages.length > 0) {
+        // Estimate storage (would need to get actual file sizes from S3)
+        // For now, we'll skip storage tracking on delete as we don't have file sizes
+        // This can be improved later by storing file sizes in the database
+      }
 
       // Clear menu cache for this location
       await clearMenuCache(locationId, location?.slug);

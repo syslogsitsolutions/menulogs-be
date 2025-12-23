@@ -15,6 +15,7 @@ import { logger } from '../utils/logger.util';
 const CURRENCY = process.env.RAZORPAY_CURRENCY || 'INR';
 
 // Pricing plans with multi-currency support
+// Per-location pricing model
 export const PRICING_PLANS = {
   FREE: {
     id: 'FREE',
@@ -24,85 +25,136 @@ export const PRICING_PLANS = {
     priceYearly: 0,
     interval: 'MONTHLY',
     features: {
-      locations: 1,
       menuItems: 20,
+      categories: 5,
       banners: 0,
+      featuredSections: 0,
       analytics: 'basic',
       support: 'email',
       customDomain: false,
       apiAccess: false,
+      whiteLabel: false,
+      multiLanguage: false,
+      menuVersioning: false,
+      abTesting: false,
+      customWorkflows: false,
+      sso: false,
     },
     limits: {
-      storage: '100MB',
-      imageUploads: 20,
-      videoUploads: 0,
+      menuItems: 20,
+      categories: 5,
+      banners: 0,
+      featuredSections: 0,
+      imageStorageBytes: 100 * 1024 * 1024, // 100 MB
+      videoStorageBytes: 0,
+      monthlyImageUploads: 20,
+      monthlyVideoUploads: 0,
+      teamMembers: 2,
     },
   },
-  STARTER: {
-    id: 'STARTER',
-    name: 'Starter',
-    description: 'Best for small restaurants',
-    price: CURRENCY === 'INR' ? 299 : 29,
-    priceYearly: CURRENCY === 'INR' ? 3051 : 305, // 15% discount
+  STANDARD: {
+    id: 'STANDARD',
+    name: 'Standard',
+    description: 'Best for single location restaurants',
+    price: CURRENCY === 'INR' ? 499 : 5,
+    priceYearly: CURRENCY === 'INR' ? 4990 : 50, // 17% discount
     interval: 'MONTHLY',
     features: {
-      locations: 3,
       menuItems: 100,
+      categories: 20,
       banners: 5,
-      analytics: 'standard',
-      support: 'email + chat',
+      featuredSections: 1,
+      analytics: 'basic',
+      support: 'email',
       customDomain: false,
       apiAccess: false,
+      whiteLabel: false,
+      multiLanguage: false,
+      menuVersioning: false,
+      abTesting: false,
+      customWorkflows: false,
+      sso: false,
     },
     limits: {
-      storage: '1GB',
-      imageUploads: 100,
-      videoUploads: 5,
+      menuItems: 100,
+      categories: 20,
+      banners: 5,
+      featuredSections: 1,
+      imageStorageBytes: 2 * 1024 * 1024 * 1024, // 2 GB
+      videoStorageBytes: 100 * 1024 * 1024, // 100 MB
+      monthlyImageUploads: 200,
+      monthlyVideoUploads: 5,
+      teamMembers: 2,
     },
   },
   PROFESSIONAL: {
     id: 'PROFESSIONAL',
     name: 'Professional',
     description: 'For growing restaurant chains',
-    price: CURRENCY === 'INR' ? 799 : 79,
-    priceYearly: CURRENCY === 'INR' ? 8149 : 815, // 15% discount
+    price: CURRENCY === 'INR' ? 1499 : 15,
+    priceYearly: CURRENCY === 'INR' ? 14990 : 150, // 17% discount
     interval: 'MONTHLY',
     features: {
-      locations: 10,
       menuItems: 500,
+      categories: 50,
       banners: 20,
+      featuredSections: 3,
       analytics: 'advanced',
       support: 'priority',
       customDomain: true,
       apiAccess: true,
+      whiteLabel: false,
+      multiLanguage: true,
+      menuVersioning: true,
+      abTesting: false,
+      customWorkflows: false,
+      sso: false,
     },
     limits: {
-      storage: '10GB',
-      imageUploads: 500,
-      videoUploads: 50,
+      menuItems: 500,
+      categories: 50,
+      banners: 20,
+      featuredSections: 3,
+      imageStorageBytes: 10 * 1024 * 1024 * 1024, // 10 GB
+      videoStorageBytes: 1 * 1024 * 1024 * 1024, // 1 GB
+      monthlyImageUploads: 1000,
+      monthlyVideoUploads: 25,
+      teamMembers: 5,
     },
   },
-  ENTERPRISE: {
-    id: 'ENTERPRISE',
-    name: 'Enterprise',
-    description: 'Unlimited everything for large chains',
-    price: CURRENCY === 'INR' ? 1999 : 199,
-    priceYearly: CURRENCY === 'INR' ? 20389 : 2039, // 15% discount
+  CUSTOM: {
+    id: 'CUSTOM',
+    name: 'Custom',
+    description: 'Unlimited everything for enterprise chains',
+    price: CURRENCY === 'INR' ? 4999 : 50, // Starting price
+    priceYearly: CURRENCY === 'INR' ? 49990 : 500, // Starting price with discount
     interval: 'MONTHLY',
     features: {
-      locations: -1, // unlimited
       menuItems: -1, // unlimited
+      categories: -1, // unlimited
       banners: -1, // unlimited
+      featuredSections: -1, // unlimited
       analytics: 'premium',
       support: 'dedicated',
       customDomain: true,
       apiAccess: true,
       whiteLabel: true,
+      multiLanguage: true,
+      menuVersioning: true,
+      abTesting: true,
+      customWorkflows: true,
+      sso: true,
     },
     limits: {
-      storage: 'Unlimited',
-      imageUploads: -1,
-      videoUploads: -1,
+      menuItems: -1, // unlimited
+      categories: -1, // unlimited
+      banners: -1, // unlimited
+      featuredSections: -1, // unlimited
+      imageStorageBytes: -1, // unlimited
+      videoStorageBytes: -1, // unlimited
+      monthlyImageUploads: -1, // unlimited
+      monthlyVideoUploads: -1, // unlimited
+      teamMembers: -1, // unlimited
     },
   },
 };
@@ -148,12 +200,15 @@ export class SubscriptionService {
       throw new Error('Invalid plan');
     }
 
-    // Calculate price based on billing cycle
-    const price = billingCycle === 'YEARLY' ? planDetails.price * 12 * 0.85 : planDetails.price;
+    // Calculate price based on billing cycle (17% discount for yearly)
+    const price = billingCycle === 'YEARLY' ? planDetails.priceYearly : planDetails.price;
 
     const startDate = new Date();
     const nextBillingDate = new Date();
     nextBillingDate.setMonth(nextBillingDate.getMonth() + (billingCycle === 'MONTHLY' ? 1 : 12));
+
+    // Set feature flags based on plan
+    const featureFlags = this.getFeatureFlagsForPlan(plan);
 
     // Create subscription in database
     const subscription = await prisma.subscription.create({
@@ -163,9 +218,15 @@ export class SubscriptionService {
         status: plan === 'FREE' ? 'ACTIVE' : 'TRIAL',
         billingCycle,
         price,
-        currency: 'USD',
+        currency: CURRENCY,
         startDate,
         nextBillingDate: plan === 'FREE' ? null : nextBillingDate,
+        // Feature flags
+        teamMemberLimit: featureFlags.teamMemberLimit,
+        customDomainEnabled: featureFlags.customDomainEnabled,
+        apiAccessEnabled: featureFlags.apiAccessEnabled,
+        whiteLabelEnabled: featureFlags.whiteLabelEnabled,
+        ssoEnabled: featureFlags.ssoEnabled,
       },
     });
 
@@ -295,7 +356,11 @@ export class SubscriptionService {
 
     const planDetails = PRICING_PLANS[newPlan];
     const cycle = billingCycle || subscription.billingCycle;
-    const price = cycle === 'YEARLY' ? planDetails.price * 12 * 0.85 : planDetails.price;
+    // 17% discount for yearly billing
+    const price = cycle === 'YEARLY' ? planDetails.priceYearly : planDetails.price;
+
+    // Set feature flags based on new plan
+    const featureFlags = this.getFeatureFlagsForPlan(newPlan);
 
     // Update subscription
     const updated = await prisma.subscription.update({
@@ -305,6 +370,12 @@ export class SubscriptionService {
         price,
         billingCycle: cycle,
         status: newPlan === 'FREE' ? 'ACTIVE' : subscription.status,
+        // Update feature flags
+        teamMemberLimit: featureFlags.teamMemberLimit,
+        customDomainEnabled: featureFlags.customDomainEnabled,
+        apiAccessEnabled: featureFlags.apiAccessEnabled,
+        whiteLabelEnabled: featureFlags.whiteLabelEnabled,
+        ssoEnabled: featureFlags.ssoEnabled,
       },
     });
 
@@ -317,6 +388,35 @@ export class SubscriptionService {
     });
 
     return updated;
+  }
+
+  /**
+   * Get feature flags for a plan
+   */
+  getFeatureFlagsForPlan(plan: keyof typeof PRICING_PLANS) {
+    const planDetails = PRICING_PLANS[plan];
+    
+    return {
+      teamMemberLimit: planDetails.limits.teamMembers === -1 ? 999999 : planDetails.limits.teamMembers,
+      customDomainEnabled: planDetails.features.customDomain,
+      apiAccessEnabled: planDetails.features.apiAccess,
+      whiteLabelEnabled: planDetails.features.whiteLabel,
+      ssoEnabled: planDetails.features.sso,
+    };
+  }
+
+  /**
+   * Get plan limits
+   */
+  getPlanLimits(plan: keyof typeof PRICING_PLANS) {
+    return PRICING_PLANS[plan].limits;
+  }
+
+  /**
+   * Get plan features
+   */
+  getPlanFeatures(plan: keyof typeof PRICING_PLANS) {
+    return PRICING_PLANS[plan].features;
   }
 
   // Cancel subscription
@@ -378,13 +478,19 @@ export class SubscriptionService {
     subscriptionId: string,
     amount: number,
     description: string,
-    dueDate: Date
+    dueDate: Date,
+    currency?: string
   ) {
+    const subscription = await prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+      select: { currency: true, plan: true },
+    });
+
     const invoice = await prisma.invoice.create({
       data: {
         subscriptionId,
         amount,
-        currency: 'USD',
+        currency: currency || subscription?.currency || CURRENCY,
         status: 'PENDING',
         dueDate,
         description,
@@ -473,14 +579,39 @@ export class SubscriptionService {
     });
 
     if (subscription) {
+      // Get feature flags for the plan
+      const featureFlags = this.getFeatureFlagsForPlan(subscription.plan as keyof typeof PRICING_PLANS);
+
       await prisma.subscription.update({
         where: { id: subscription.id },
-        data: { status: 'ACTIVE' },
+        data: {
+          status: 'ACTIVE',
+          // Update feature flags
+          teamMemberLimit: featureFlags.teamMemberLimit,
+          customDomainEnabled: featureFlags.customDomainEnabled,
+          apiAccessEnabled: featureFlags.apiAccessEnabled,
+          whiteLabelEnabled: featureFlags.whiteLabelEnabled,
+          ssoEnabled: featureFlags.ssoEnabled,
+          // Clear grace period if any
+          gracePeriodStatus: null,
+          gracePeriodEndsAt: null,
+          paymentRetryCount: 0,
+          dunningStatus: null,
+        },
       });
 
       await prisma.location.update({
         where: { id: subscription.locationId },
-        data: { subscriptionStatus: 'ACTIVE' },
+        data: {
+          subscriptionStatus: 'ACTIVE',
+          subscriptionPlan: subscription.plan,
+        },
+      });
+
+      logger.info('Subscription activated with feature flags:', {
+        subscriptionId: subscription.id,
+        plan: subscription.plan,
+        locationId: subscription.locationId,
       });
     }
   }
@@ -492,11 +623,18 @@ export class SubscriptionService {
 
     if (subscription) {
       // Create invoice
+      // Get location for invoice description
+      const location = await prisma.location.findUnique({
+        where: { id: subscription.locationId },
+        select: { name: true },
+      });
+
       await this.createInvoice(
         subscription.id,
         payload.payment.amount / 100,
-        `Subscription charge for ${subscription.plan}`,
-        new Date()
+        `Subscription charge for ${subscription.plan} plan - ${location?.name || 'Location'}`,
+        new Date(),
+        payload.payment.currency
       );
 
       // Mark as paid if payment successful
@@ -543,14 +681,33 @@ export class SubscriptionService {
     });
 
     if (subscription) {
+      // Set grace period (7 days)
+      const gracePeriodEndsAt = new Date();
+      gracePeriodEndsAt.setDate(gracePeriodEndsAt.getDate() + 7);
+
+      // Increment payment retry count
+      const currentRetryCount = subscription.paymentRetryCount || 0;
+
       await prisma.subscription.update({
         where: { id: subscription.id },
-        data: { status: 'INACTIVE' },
+        data: {
+          status: 'INACTIVE',
+          gracePeriodStatus: 'ACTIVE',
+          gracePeriodEndsAt,
+          lastPaymentAttempt: new Date(),
+          paymentRetryCount: currentRetryCount + 1,
+          dunningStatus: currentRetryCount === 0 ? 'FIRST_RETRY' : 
+                        currentRetryCount === 1 ? 'SECOND_RETRY' :
+                        currentRetryCount === 2 ? 'FINAL_NOTICE' : 'CANCELLED',
+        },
       });
 
+      // Keep location active during grace period
       await prisma.location.update({
         where: { id: subscription.locationId },
-        data: { subscriptionStatus: 'INACTIVE' },
+        data: {
+          subscriptionStatus: 'INACTIVE', // Subscription inactive but grace period active
+        },
       });
 
       // Create failed invoice record
@@ -562,17 +719,27 @@ export class SubscriptionService {
             currency: payload.payment.currency || CURRENCY,
             status: 'FAILED',
             dueDate: new Date(),
-            description: `Failed payment for ${subscription.plan}`,
+            description: `Failed payment for ${subscription.plan} - Retry ${currentRetryCount + 1}`,
             razorpayPaymentId: payload.payment.id,
           },
         });
       }
 
-      logger.warn('Payment failed for subscription:', {
+      logger.warn('Payment failed for subscription - grace period started:', {
         subscriptionId: subscription.id,
         locationId: subscription.locationId,
         paymentId: payload.payment?.id,
+        retryCount: currentRetryCount + 1,
+        gracePeriodEndsAt,
       });
+
+      // Trigger dunning process
+      try {
+        const dunningService = (await import('./dunning.service')).default;
+        await dunningService.processFailedPayment(subscription.id);
+      } catch (error) {
+        logger.error('Failed to trigger dunning process:', error);
+      }
     }
   }
 

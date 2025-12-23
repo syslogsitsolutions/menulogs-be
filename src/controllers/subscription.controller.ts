@@ -1,17 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import subscriptionService, { PRICING_PLANS } from '../services/subscription.service';
+import featureAccessService from '../services/featureAccess.service';
+import usageTrackingService from '../services/usageTracking.service';
 import prisma from '../config/database';
 import { z } from 'zod';
 import crypto from 'crypto';
 
 const createSubscriptionSchema = z.object({
   locationId: z.string().uuid(),
-  plan: z.enum(['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE']),
+  plan: z.enum(['FREE', 'STANDARD', 'PROFESSIONAL', 'CUSTOM']),
   billingCycle: z.enum(['MONTHLY', 'YEARLY']).default('MONTHLY'),
 });
 
 const changePlanSchema = z.object({
-  plan: z.enum(['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE']),
+  plan: z.enum(['FREE', 'STANDARD', 'PROFESSIONAL', 'CUSTOM']),
   billingCycle: z.enum(['MONTHLY', 'YEARLY']).optional(),
 });
 
@@ -272,15 +274,6 @@ export class SubscriptionController {
           id: locationId,
           business: { ownerId: userId },
         },
-        include: {
-          subscription: true,
-          _count: {
-            select: {
-              menuItems: true,
-              banners: true,
-            },
-          },
-        },
       });
 
       if (!location) {
@@ -288,33 +281,62 @@ export class SubscriptionController {
         return;
       }
 
-      // Get plan limits
-      const plan = location.subscriptionPlan || 'FREE';
-      const planDetails = PRICING_PLANS[plan];
-
-      // Calculate usage
-      const usage = {
-        plan,
-        limits: planDetails.features,
-        current: {
-          menuItems: location._count.menuItems,
-          banners: location._count.banners,
-        },
-        percentages: {
-          menuItems:
-            planDetails.features.menuItems === -1
-              ? 0
-              : (location._count.menuItems / planDetails.features.menuItems) * 100,
-          banners:
-            planDetails.features.banners === -1
-              ? 0
-              : planDetails.features.banners === 0
-              ? 100
-              : (location._count.banners / planDetails.features.banners) * 100,
-        },
-      };
+      // Get usage summary using usage tracking service
+      const usage = await usageTrackingService.getUsageSummary(locationId);
 
       res.json({ usage });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /api/v1/subscriptions/features/:plan
+  async getFeatures(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { plan } = req.params;
+      
+      if (!['FREE', 'STANDARD', 'PROFESSIONAL', 'CUSTOM'].includes(plan)) {
+        res.status(400).json({ error: 'Invalid plan' });
+        return;
+      }
+
+      const features = featureAccessService.getFeatures(plan as any);
+      const planDetails = PRICING_PLANS[plan as keyof typeof PRICING_PLANS];
+
+      res.json({
+        plan,
+        features,
+        planDetails: {
+          name: planDetails.name,
+          description: planDetails.description,
+          price: planDetails.price,
+          priceYearly: planDetails.priceYearly,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /api/v1/subscriptions/check-feature/:plan/:feature
+  async checkFeatureAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { plan, feature } = req.params;
+      
+      if (!['FREE', 'STANDARD', 'PROFESSIONAL', 'CUSTOM'].includes(plan)) {
+        res.status(400).json({ error: 'Invalid plan' });
+        return;
+      }
+
+      const hasFeature = featureAccessService.hasFeature(plan as any, feature as any);
+      const recommendation = featureAccessService.getUpgradeRecommendation(plan as any, feature as any);
+
+      res.json({
+        plan,
+        feature,
+        hasAccess: hasFeature,
+        upgradeRecommendation: recommendation,
+      });
     } catch (error) {
       next(error);
     }
@@ -348,7 +370,7 @@ export class SubscriptionController {
       }
 
       const planDetails = PRICING_PLANS[plan];
-      const price = billingCycle === 'YEARLY' ? planDetails.price * 12 * 0.85 : planDetails.price;
+      const price = billingCycle === 'YEARLY' ? planDetails.priceYearly : planDetails.price;
 
       // Create checkout session (placeholder - integrate with actual payment gateway)
       const checkoutSession = {
