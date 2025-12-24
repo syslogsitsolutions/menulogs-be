@@ -22,10 +22,18 @@ ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 RUN npx prisma generate
 
 # Copy source code
+# Use .dockerignore to exclude unnecessary files
 COPY . .
 
+# Add build timestamp to force cache invalidation on code changes
+ARG BUILD_DATE
+ARG BUILD_VERSION
+ENV BUILD_DATE=${BUILD_DATE}
+ENV BUILD_VERSION=${BUILD_VERSION}
+
 # Build TypeScript to JavaScript
-RUN npm run build
+# Clean dist folder first to ensure fresh build
+RUN rm -rf dist && npm run build
 
 # ============================================
 # Production Stage
