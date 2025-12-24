@@ -12,82 +12,14 @@ import routes from './routes';
 const app: Application = express();
 
 // CORS configuration - MUST be before all other middleware
-// Explicitly allow frontend origins
-const allowedOrigins = [
-  'https://app.menulogs.in',
-  'https://menulogs.in',
-  'https://app-dev.menulogs.in',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000',
-];
-
-// Normalize origin for comparison (remove trailing slashes, lowercase)
-const normalizeOrigin = (origin: string): string => {
-  return origin.toLowerCase().replace(/\/$/, '');
-};
-
-// Check if origin matches allowed domains
-const isOriginAllowed = (origin: string): boolean => {
-  const normalizedOrigin = normalizeOrigin(origin);
-  const normalizedAllowedOrigins = allowedOrigins.map(normalizeOrigin);
-  
-  // Exact match
-  if (normalizedAllowedOrigins.includes(normalizedOrigin)) {
-    return true;
-  }
-  
-  // Allow any subdomain of menulogs.in
-  if (normalizedOrigin.endsWith('.menulogs.in') || normalizedOrigin === 'menulogs.in') {
-    return true;
-  }
-  
-  return false;
-};
-
+// Minimal CORS setup - allow all origins
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, Postman, curl)
-      if (!origin) {
-        return callback(null, true);
-      }
-      
-      // Check if origin is allowed
-      if (isOriginAllowed(origin)) {
-        // Return the origin value to ensure proper CORS headers
-        return callback(null, origin);
-      }
-      
-      // In development, allow all origins
-      if (process.env.NODE_ENV === 'development') {
-        return callback(null, origin);
-      }
-      
-      // Log the rejected origin for debugging
-      console.warn(`CORS: Rejected origin: ${origin} (normalized: ${normalizeOrigin(origin)})`);
-      
-      // Reject other origins
-      callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true, // Allow cookies to be sent
+    origin: true, // Allow all origins
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'X-Requested-With',
-      'Accept',
-      'Origin',
-      'Access-Control-Request-Method',
-      'Access-Control-Request-Headers',
-      'Cookie',
-      'Set-Cookie',
-    ],
-    exposedHeaders: ['Content-Range', 'X-Content-Range', 'Set-Cookie'],
-    maxAge: 86400, // 24 hours - cache preflight requests
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Set-Cookie'],
+    exposedHeaders: ['Set-Cookie'],
   })
 );
 
