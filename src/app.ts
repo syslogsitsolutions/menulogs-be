@@ -23,6 +23,29 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
 ];
 
+// Normalize origin for comparison (remove trailing slashes, lowercase)
+const normalizeOrigin = (origin: string): string => {
+  return origin.toLowerCase().replace(/\/$/, '');
+};
+
+// Check if origin matches allowed domains
+const isOriginAllowed = (origin: string): boolean => {
+  const normalizedOrigin = normalizeOrigin(origin);
+  const normalizedAllowedOrigins = allowedOrigins.map(normalizeOrigin);
+  
+  // Exact match
+  if (normalizedAllowedOrigins.includes(normalizedOrigin)) {
+    return true;
+  }
+  
+  // Allow any subdomain of menulogs.in
+  if (normalizedOrigin.endsWith('.menulogs.in') || normalizedOrigin === 'menulogs.in') {
+    return true;
+  }
+  
+  return false;
+};
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -31,15 +54,19 @@ app.use(
         return callback(null, true);
       }
       
-      // Check if origin is in allowed list
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
+      // Check if origin is allowed
+      if (isOriginAllowed(origin)) {
+        // Return the origin value to ensure proper CORS headers
+        return callback(null, origin);
       }
       
       // In development, allow all origins
       if (process.env.NODE_ENV === 'development') {
-        return callback(null, true);
+        return callback(null, origin);
       }
+      
+      // Log the rejected origin for debugging
+      console.warn(`CORS: Rejected origin: ${origin} (normalized: ${normalizeOrigin(origin)})`);
       
       // Reject other origins
       callback(new Error('Not allowed by CORS'));
