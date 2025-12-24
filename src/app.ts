@@ -12,16 +12,8 @@ import routes from './routes';
 const app: Application = express();
 
 // CORS configuration - MUST be before all other middleware
-// Minimal CORS setup - allow all origins
-app.use(
-  cors({
-    origin: true, // Allow all origins
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Set-Cookie'],
-    exposedHeaders: ['Set-Cookie'],
-  })
-);
+// Simplest possible CORS - allow everything
+app.use(cors());
 
 // Security middleware - Configure helmet to not interfere with CORS
 app.use(helmet({
