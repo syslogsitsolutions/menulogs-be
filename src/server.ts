@@ -15,7 +15,7 @@ const startServer = async () => {
   try {
     // Test database connection
     await prisma.$connect();
-    logger.info('✅ Database connected...');
+    logger.info('✅ Database connected');
 
     // Test Redis connection
     await redis.ping();
