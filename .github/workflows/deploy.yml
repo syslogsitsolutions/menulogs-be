@@ -100,18 +100,19 @@ jobs:
           IMAGE_URL: ${{ steps.build-image.outputs.image }}
           VERSION_TAG: ${{ steps.build-image.outputs.version_tag }}
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'DEPLOY_SCRIPT'
-            set -euo pipefail
+          ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << EOF
+            set -eo pipefail
             
-            IMAGE_URL="${IMAGE_URL}"
-            ENVIRONMENT="${ENVIRONMENT}"
+            IMAGE_URL="${{ steps.build-image.outputs.image }}"
+            ENVIRONMENT="${{ env.ENVIRONMENT }}"
             ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com"
+            export IMAGE_URL ENVIRONMENT ECR_REGISTRY
             
             echo "Logging in to ECR..."
             aws ecr get-login-password --region ap-south-1 | \
-              docker login --username AWS --password-stdin ${ECR_REGISTRY}
+              docker login --username AWS --password-stdin \${ECR_REGISTRY}
             
-            cd /opt/menulogs/${ENVIRONMENT}
+            cd /opt/menulogs/\${ENVIRONMENT}
             
             echo "Updating docker-compose.yml..."
             if [ ! -f docker-compose.yml ]; then
@@ -119,8 +120,8 @@ jobs:
               exit 1
             fi
             
-            cp docker-compose.yml docker-compose.yml.backup.$(date +%s)
-            sed -i "s|image:.*menulogs-backend[^[:space:]]*|image: ${IMAGE_URL}|g" docker-compose.yml
+            cp docker-compose.yml docker-compose.yml.backup.\$(date +%s)
+            sed -i "s|image:.*menulogs-backend[^[:space:]]*|image: \${IMAGE_URL}|g" docker-compose.yml
             
             echo "Pulling image..."
             docker-compose pull backend
@@ -157,7 +158,7 @@ jobs:
                 echo "Health check passed"
                 break
               fi
-              if [ $i -eq 10 ]; then
+              if [ \$i -eq 10 ]; then
                 echo "Warning: Health check failed after 10 attempts"
                 docker-compose logs --tail=30 backend
               else
@@ -165,9 +166,9 @@ jobs:
               fi
             done
             
-            RUNNING_IMAGE=$(docker inspect $(docker-compose ps -q backend) --format='{{.Config.Image}}' 2>/dev/null)
-            echo "Deployed image: ${RUNNING_IMAGE}"
-          DEPLOY_SCRIPT
+            RUNNING_IMAGE=\$(docker inspect \$(docker-compose ps -q backend) --format='{{.Config.Image}}' 2>/dev/null)
+            echo "Deployed image: \${RUNNING_IMAGE}"
+          EOF
 
       - name: Deployment Summary
         run: |
