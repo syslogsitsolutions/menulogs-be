@@ -379,7 +379,7 @@ export class LocationController {
 
       res.json({
         message: 'Location updated successfully',
-        location: fullLocation,
+        location: serializeLocation(fullLocation),
       });
     } catch (error) {
       if (error instanceof z.ZodError) {

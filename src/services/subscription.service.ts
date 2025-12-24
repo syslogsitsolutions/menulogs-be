@@ -25,8 +25,8 @@ export const PRICING_PLANS = {
     priceYearly: 0,
     interval: 'MONTHLY',
     features: {
-      menuItems: 20,
-      categories: 5,
+      menuItems: 5,
+      categories: 2,
       banners: 0,
       featuredSections: 0,
       analytics: 'basic',
@@ -41,10 +41,10 @@ export const PRICING_PLANS = {
       sso: false,
     },
     limits: {
-      menuItems: 20,
-      categories: 5,
-      banners: 0,
-      featuredSections: 0,
+      menuItems: 5,
+      categories: 2,
+      banners: 1,
+      featuredSections: 1,
       imageStorageBytes: 100 * 1024 * 1024, // 100 MB
       videoStorageBytes: 0,
       monthlyImageUploads: 20,
