@@ -108,29 +108,36 @@ jobs:
           EC2_HOST: ${{ env.EC2_HOST }}
           EC2_USER: ${{ env.EC2_USER }}
           ENVIRONMENT: ${{ env.ENVIRONMENT }}
-          VERSION_TAG: ${{ steps.build-image.outputs.version_tag }}
           IMAGE_URL: ${{ steps.build-image.outputs.image }}
+          VERSION_TAG: ${{ steps.build-image.outputs.version_tag }}
         run: |
           ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << EOF
             set -e
+            set -x  # Enable command tracing for debugging
+            
+            # Set variables from GitHub Actions environment
+            IMAGE_URL="${IMAGE_URL}"
+            VERSION_TAG="${VERSION_TAG}"
+            ENVIRONMENT="${ENVIRONMENT}"
+            export IMAGE_URL VERSION_TAG ENVIRONMENT
+            
+            echo "📦 Image URL: \${IMAGE_URL}"
+            echo "📦 Version Tag: \${VERSION_TAG}"
+            echo "📦 Environment: \${ENVIRONMENT}"
             
             # Login to ECR
             aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
             
             # Navigate to deployment directory
-            cd /opt/menulogs/${{ env.ENVIRONMENT }}
-            
-            # Export image URL for use in docker-compose
-            export IMAGE_URL="${{ steps.build-image.outputs.image }}"
-            export VERSION_TAG="${{ steps.build-image.outputs.version_tag }}"
-            
-            echo "📦 Pulling image: ${IMAGE_URL}"
+            cd /opt/menulogs/\${ENVIRONMENT}
             
             # Force pull the specific version tag (not just 'latest' or 'prod')
-            docker pull ${IMAGE_URL} || {
-              echo "⚠️  Failed to pull ${IMAGE_URL}, trying with ${IMAGE_TAG} tag..."
+            echo "📥 Pulling specific version: \${IMAGE_URL}"
+            docker pull \${IMAGE_URL} || {
+              echo "⚠️  Failed to pull \${IMAGE_URL}, trying with environment tag..."
               docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-              export IMAGE_URL="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+              IMAGE_URL="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+              export IMAGE_URL
             }
             
             # Also pull latest tag to ensure it's updated
@@ -150,24 +157,31 @@ jobs:
               
               # Update image tag - try multiple patterns
               # Pattern 1: image: repo/menulogs-backend:tag
-              sed -i.tmp "s|image:.*menulogs-backend[^[:space:]]*|image: ${IMAGE_URL}|g" docker-compose.yml || true
+              sed -i.tmp "s|image:.*menulogs-backend[^[:space:]]*|image: \${IMAGE_URL}|g" docker-compose.yml || true
               # Pattern 2: image: repo/backend:tag  
-              sed -i.tmp "s|image:.*/backend[^[:space:]]*|image: ${IMAGE_URL}|g" docker-compose.yml || true
+              sed -i.tmp "s|image:.*/backend[^[:space:]]*|image: \${IMAGE_URL}|g" docker-compose.yml || true
               # Clean up temp file
               rm -f docker-compose.yml.tmp || true
               
               echo "✅ Updated docker-compose.yml"
-              echo "   New image: ${IMAGE_URL}"
+              echo "   New image: \${IMAGE_URL}"
+              
+              # Verify the update worked
+              echo "🔍 Verifying docker-compose.yml update:"
+              grep "image:" docker-compose.yml | grep backend || grep "image:" docker-compose.yml
             else
-              echo "⚠️  docker-compose.yml not found, using default pull"
+              echo "⚠️  docker-compose.yml not found!"
+              exit 1
             fi
             
-            # Pull the specific image version
-            echo "📥 Pulling image: ${IMAGE_URL}"
-            docker pull ${IMAGE_URL}
+            # Pull the specific image version using docker-compose
+            # This ensures docker-compose uses the updated image tag
+            echo "📥 Pulling image using docker-compose..."
+            docker-compose pull backend
             
-            # Also pull using docker-compose (in case it references other tags)
-            docker-compose pull backend || true
+            # Verify the image was pulled
+            echo "🔍 Verifying image pull:"
+            docker images | grep menulogs-backend | head -3
             
             # Regenerate Prisma Client (needed after Prisma 7 upgrade)
             echo "🔄 Regenerating Prisma Client..."
@@ -184,13 +198,34 @@ jobs:
             # Force recreate the container with the new image
             # This ensures the updated docker-compose.yml is used
             echo "🚀 Starting backend with new image..."
-            docker-compose up -d --force-recreate --no-deps backend
+            
+            # Stop and remove first to ensure clean start
+            docker-compose stop backend || true
+            docker-compose rm -f backend || true
+            
+            # Start the container (this will pull if needed and create new container)
+            docker-compose up -d --force-recreate backend
+            
+            # Wait a moment for container to start
+            sleep 5
+            
+            # Verify container is running
+            echo "🔍 Checking container status:"
+            docker-compose ps backend
+            
+            # Verify container is actually running
+            if ! docker-compose ps backend | grep -q "Up"; then
+              echo "❌ Container failed to start!"
+              echo "📋 Container logs:"
+              docker-compose logs backend
+              exit 1
+            fi
             
             # Verify the container is using the correct image
             echo "🔍 Verifying deployed image..."
             DEPLOYED_IMAGE=\$(docker inspect \$(docker-compose ps -q backend) --format='{{.Config.Image}}' 2>/dev/null || echo "unknown")
             echo "   Deployed image: \${DEPLOYED_IMAGE}"
-            echo "   Expected image: ${IMAGE_URL}"
+            echo "   Expected image: \${IMAGE_URL}"
             
             # Check health
             echo "🏥 Checking health..."
