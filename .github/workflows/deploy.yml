@@ -108,16 +108,66 @@ jobs:
           EC2_HOST: ${{ env.EC2_HOST }}
           EC2_USER: ${{ env.EC2_USER }}
           ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          VERSION_TAG: ${{ steps.build-image.outputs.version_tag }}
+          IMAGE_URL: ${{ steps.build-image.outputs.image }}
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'ENDSSH'
+          ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << EOF
+            set -e
+            
             # Login to ECR
             aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
             
             # Navigate to deployment directory
             cd /opt/menulogs/${{ env.ENVIRONMENT }}
             
-            # Pull latest image
-            docker-compose pull backend
+            # Export image URL for use in docker-compose
+            export IMAGE_URL="${{ steps.build-image.outputs.image }}"
+            export VERSION_TAG="${{ steps.build-image.outputs.version_tag }}"
+            
+            echo "📦 Pulling image: ${IMAGE_URL}"
+            
+            # Force pull the specific version tag (not just 'latest' or 'prod')
+            docker pull ${IMAGE_URL} || {
+              echo "⚠️  Failed to pull ${IMAGE_URL}, trying with ${IMAGE_TAG} tag..."
+              docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+              export IMAGE_URL="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+            }
+            
+            # Also pull latest tag to ensure it's updated
+            docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest || true
+            
+            # Stop and remove old container to force recreation
+            echo "🛑 Stopping old container..."
+            docker-compose stop backend || true
+            docker-compose rm -f backend || true
+            
+            # Update docker-compose.yml to use the specific version tag
+            # This ensures we deploy the exact version that was built
+            if [ -f docker-compose.yml ]; then
+              echo "📝 Updating docker-compose.yml with version tag..."
+              # Backup original
+              cp docker-compose.yml docker-compose.yml.backup.$(date +%s) || true
+              
+              # Update image tag - try multiple patterns
+              # Pattern 1: image: repo/menulogs-backend:tag
+              sed -i.tmp "s|image:.*menulogs-backend[^[:space:]]*|image: ${IMAGE_URL}|g" docker-compose.yml || true
+              # Pattern 2: image: repo/backend:tag  
+              sed -i.tmp "s|image:.*/backend[^[:space:]]*|image: ${IMAGE_URL}|g" docker-compose.yml || true
+              # Clean up temp file
+              rm -f docker-compose.yml.tmp || true
+              
+              echo "✅ Updated docker-compose.yml"
+              echo "   New image: ${IMAGE_URL}"
+            else
+              echo "⚠️  docker-compose.yml not found, using default pull"
+            fi
+            
+            # Pull the specific image version
+            echo "📥 Pulling image: ${IMAGE_URL}"
+            docker pull ${IMAGE_URL}
+            
+            # Also pull using docker-compose (in case it references other tags)
+            docker-compose pull backend || true
             
             # Regenerate Prisma Client (needed after Prisma 7 upgrade)
             echo "🔄 Regenerating Prisma Client..."
@@ -131,15 +181,36 @@ jobs:
             # Verify migrations status
             docker-compose run --rm backend npx prisma migrate status || true
             
-            # Restart backend service
-            docker-compose up -d backend
+            # Force recreate the container with the new image
+            # This ensures the updated docker-compose.yml is used
+            echo "🚀 Starting backend with new image..."
+            docker-compose up -d --force-recreate --no-deps backend
+            
+            # Verify the container is using the correct image
+            echo "🔍 Verifying deployed image..."
+            DEPLOYED_IMAGE=\$(docker inspect \$(docker-compose ps -q backend) --format='{{.Config.Image}}' 2>/dev/null || echo "unknown")
+            echo "   Deployed image: \${DEPLOYED_IMAGE}"
+            echo "   Expected image: ${IMAGE_URL}"
             
             # Check health
+            echo "🏥 Checking health..."
             sleep 10
-            curl -f http://localhost:5000/health || exit 1
+            for i in {1..6}; do
+              if curl -f http://localhost:5000/health; then
+                echo "✅ Health check passed!"
+                break
+              else
+                echo "⏳ Health check attempt \$i/6 failed, retrying..."
+                sleep 5
+              fi
+            done
+            
+            # Final verification - check logs for version info
+            echo "📋 Container logs (last 20 lines):"
+            docker-compose logs --tail=20 backend || true
             
             echo "✅ Deployment successful!"
-          ENDSSH
+          EOF
 
       - name: Deployment Summary
         run: |
