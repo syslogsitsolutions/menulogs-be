@@ -25,11 +25,13 @@ RUN npx prisma generate
 # Use .dockerignore to exclude unnecessary files
 COPY . .
 
-# Add build timestamp to force cache invalidation on code changes
+# Add build timestamp and version info to force cache invalidation on code changes
 ARG BUILD_DATE
 ARG BUILD_VERSION
+ARG PACKAGE_VERSION
 ENV BUILD_DATE=${BUILD_DATE}
 ENV BUILD_VERSION=${BUILD_VERSION}
+ENV PACKAGE_VERSION=${PACKAGE_VERSION}
 
 # Build TypeScript to JavaScript
 # Clean dist folder first to ensure fresh build

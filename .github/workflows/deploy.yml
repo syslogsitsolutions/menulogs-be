@@ -45,21 +45,54 @@ jobs:
             echo "EC2_USER=${{ secrets.EC2_USER }}" >> $GITHUB_ENV
           fi
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Build, tag, and push image to Amazon ECR
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
-          # Build Docker image (repo root is backend directory)
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          # Get version from package.json
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          GIT_COMMIT=$(echo ${{ github.sha }} | cut -c1-7)
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           
-          # Push to ECR
+          # Create version tags
+          VERSION_TAG="v${PACKAGE_VERSION}-$(date +%Y%m%d)-${GIT_COMMIT}"
+          PROD_TAG="prod-$(date +%Y%m%d-%H%M%S)"
+          
+          echo "📦 Building with version tags:"
+          echo "   Package Version: ${PACKAGE_VERSION}"
+          echo "   Version Tag: ${VERSION_TAG}"
+          echo "   Prod Tag: ${PROD_TAG}"
+          echo "   Environment Tag: ${IMAGE_TAG}"
+          
+          # Build Docker image with version metadata
+          docker build \
+            --build-arg BUILD_DATE="${BUILD_DATE}" \
+            --build-arg BUILD_VERSION="${VERSION_TAG}" \
+            --build-arg PACKAGE_VERSION="${PACKAGE_VERSION}" \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:${VERSION_TAG} \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:${PROD_TAG} \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+          
+          # Push all tags
+          echo "🚀 Pushing images to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${VERSION_TAG}
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${PROD_TAG}
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          # Set outputs for deployment
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:${VERSION_TAG}" >> $GITHUB_OUTPUT
+          echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
+          echo "prod_tag=${PROD_TAG}" >> $GITHUB_OUTPUT
 
       - name: Setup SSH
         env:
@@ -114,6 +147,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment:** ${{ env.ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Image:** ${{ steps.build-image.outputs.image }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Tag:** ${{ steps.build-image.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Prod Tag:** ${{ steps.build-image.outputs.prod_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
 
