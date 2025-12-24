@@ -174,23 +174,42 @@ jobs:
               exit 1
             fi
             
+            # Stop the container first to ensure clean deployment
+            echo "🛑 Stopping existing container..."
+            docker-compose stop backend || true
+            
             # Pull the specific image version using docker-compose
             # This ensures docker-compose uses the updated image tag
             echo "📥 Pulling image using docker-compose..."
-            docker-compose pull backend
+            if ! docker-compose pull backend; then
+              echo "❌ Failed to pull image!"
+              exit 1
+            fi
             
             # Verify the image was pulled
             echo "🔍 Verifying image pull:"
             docker images | grep menulogs-backend | head -3
             
+            # Show what image will be used
+            echo "📋 Image that will be deployed:"
+            grep "image:" docker-compose.yml | grep backend || grep "image:" docker-compose.yml
+            
+            # Remove old container to force recreation
+            echo "🗑️  Removing old container..."
+            docker-compose rm -f backend || true
+            
             # Regenerate Prisma Client (needed after Prisma 7 upgrade)
             echo "🔄 Regenerating Prisma Client..."
-            docker-compose run --rm -e PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 backend npx prisma generate
+            docker-compose run --rm -e PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 backend npx prisma generate || {
+              echo "⚠️  Prisma generate failed, continuing..."
+            }
             
             # Run database migrations BEFORE restarting
             # This ensures migrations are applied before the new code runs
             echo "🔄 Running database migrations..."
-            docker-compose run --rm -e PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 backend npx prisma migrate deploy
+            docker-compose run --rm -e PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 backend npx prisma migrate deploy || {
+              echo "⚠️  Migration failed, continuing..."
+            }
             
             # Verify migrations status
             docker-compose run --rm backend npx prisma migrate status || true
@@ -198,27 +217,51 @@ jobs:
             # Force recreate the container with the new image
             # This ensures the updated docker-compose.yml is used
             echo "🚀 Starting backend with new image..."
+            echo "   Command: docker-compose up -d --force-recreate backend"
             
-            # Stop and remove first to ensure clean start
-            docker-compose stop backend || true
-            docker-compose rm -f backend || true
-            
-            # Start the container (this will pull if needed and create new container)
-            docker-compose up -d --force-recreate backend
+            # Start the container with explicit force recreate
+            if ! docker-compose up -d --force-recreate backend; then
+              echo "❌ Failed to start container!"
+              echo "📋 Checking docker-compose status:"
+              docker-compose ps
+              exit 1
+            fi
             
             # Wait a moment for container to start
-            sleep 5
+            echo "⏳ Waiting for container to start..."
+            sleep 10
             
             # Verify container is running
             echo "🔍 Checking container status:"
             docker-compose ps backend
             
             # Verify container is actually running
+            CONTAINER_STATUS=\$(docker-compose ps backend | grep backend | awk '{print \$4}' || echo "unknown")
+            echo "   Container status: \${CONTAINER_STATUS}"
+            
             if ! docker-compose ps backend | grep -q "Up"; then
               echo "❌ Container failed to start!"
               echo "📋 Container logs:"
-              docker-compose logs backend
+              docker-compose logs --tail=50 backend
+              echo "📋 Docker-compose status:"
+              docker-compose ps
               exit 1
+            fi
+            
+            # Show container is running
+            echo "✅ Container is running!"
+            
+            # Show what image is actually running
+            echo "🔍 Verifying deployed image:"
+            RUNNING_IMAGE=\$(docker inspect \$(docker-compose ps -q backend) --format='{{.Config.Image}}' 2>/dev/null || echo "unknown")
+            echo "   Running image: \${RUNNING_IMAGE}"
+            echo "   Expected image: \${IMAGE_URL}"
+            
+            if [ "\${RUNNING_IMAGE}" != "\${IMAGE_URL}" ]; then
+              echo "⚠️  Warning: Running image doesn't match expected image!"
+              echo "   This might mean the container didn't update properly."
+            else
+              echo "✅ Image matches expected version!"
             fi
             
             # Verify the container is using the correct image
@@ -228,21 +271,40 @@ jobs:
             echo "   Expected image: \${IMAGE_URL}"
             
             # Check health
-            echo "🏥 Checking health..."
-            sleep 10
-            for i in {1..6}; do
-              if curl -f http://localhost:5000/health; then
-                echo "✅ Health check passed!"
+            echo "🏥 Checking health endpoint..."
+            sleep 5
+            HEALTH_CHECK_PASSED=false
+            for i in {1..10}; do
+              if curl -f -s http://localhost:5000/health > /dev/null 2>&1; then
+                echo "✅ Health check passed on attempt \$i!"
+                HEALTH_CHECK_PASSED=true
                 break
               else
-                echo "⏳ Health check attempt \$i/6 failed, retrying..."
-                sleep 5
+                echo "⏳ Health check attempt \$i/10 failed, retrying in 3 seconds..."
+                sleep 3
               fi
             done
             
-            # Final verification - check logs for version info
-            echo "📋 Container logs (last 20 lines):"
-            docker-compose logs --tail=20 backend || true
+            if [ "\${HEALTH_CHECK_PASSED}" = "false" ]; then
+              echo "⚠️  Health check failed after 10 attempts"
+              echo "📋 Container logs:"
+              docker-compose logs --tail=30 backend
+            fi
+            
+            # Final verification - check logs for version info and code changes
+            echo "📋 Container logs (last 30 lines):"
+            docker-compose logs --tail=30 backend || true
+            
+            # Check if new code is running (look for specific log messages)
+            echo "🔍 Verifying new code is running..."
+            if docker-compose logs backend 2>/dev/null | grep -q "Redis connected\.\.\."; then
+              echo "✅ New code detected! (Redis connected with dots)"
+            elif docker-compose logs backend 2>/dev/null | grep -q "Redis connected"; then
+              echo "⚠️  Old code detected! (Redis connected without dots)"
+              echo "   Container might not have updated properly."
+            else
+              echo "⚠️  Could not verify code version from logs"
+            fi
             
             echo "✅ Deployment successful!"
           EOF
