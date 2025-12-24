@@ -3,8 +3,8 @@ name: Deploy Backend
 on:
   push:
     branches:
-      - main      # Production deployments
-      - develop   # Development deployments
+      - main
+      - develop
 
 env:
   AWS_REGION: ap-south-1
@@ -50,28 +50,21 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Build, tag, and push image to Amazon ECR
+      - name: Build and push Docker image
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
-          # Get version from package.json
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
           GIT_COMMIT=$(echo ${{ github.sha }} | cut -c1-7)
           BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           
-          # Create version tags
           VERSION_TAG="v${PACKAGE_VERSION}-$(date +%Y%m%d)-${GIT_COMMIT}"
           PROD_TAG="prod-$(date +%Y%m%d-%H%M%S)"
           
-          echo "📦 Building with version tags:"
-          echo "   Package Version: ${PACKAGE_VERSION}"
-          echo "   Version Tag: ${VERSION_TAG}"
-          echo "   Prod Tag: ${PROD_TAG}"
-          echo "   Environment Tag: ${IMAGE_TAG}"
+          echo "Building image: ${VERSION_TAG}"
           
-          # Build Docker image with version metadata
           docker build \
             --build-arg BUILD_DATE="${BUILD_DATE}" \
             --build-arg BUILD_VERSION="${VERSION_TAG}" \
@@ -82,17 +75,13 @@ jobs:
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             .
           
-          # Push all tags
-          echo "🚀 Pushing images to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:${VERSION_TAG}
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:${PROD_TAG}
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           
-          # Set outputs for deployment
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:${VERSION_TAG}" >> $GITHUB_OUTPUT
           echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
-          echo "prod_tag=${PROD_TAG}" >> $GITHUB_OUTPUT
 
       - name: Setup SSH
         env:
@@ -111,212 +100,80 @@ jobs:
           IMAGE_URL: ${{ steps.build-image.outputs.image }}
           VERSION_TAG: ${{ steps.build-image.outputs.version_tag }}
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << EOF
-            set -e
-            set -x  # Enable command tracing for debugging
+          ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'DEPLOY_SCRIPT'
+            set -euo pipefail
             
-            # Set variables from GitHub Actions environment
             IMAGE_URL="${IMAGE_URL}"
-            VERSION_TAG="${VERSION_TAG}"
             ENVIRONMENT="${ENVIRONMENT}"
-            export IMAGE_URL VERSION_TAG ENVIRONMENT
+            ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com"
             
-            echo "📦 Image URL: \${IMAGE_URL}"
-            echo "📦 Version Tag: \${VERSION_TAG}"
-            echo "📦 Environment: \${ENVIRONMENT}"
+            echo "Logging in to ECR..."
+            aws ecr get-login-password --region ap-south-1 | \
+              docker login --username AWS --password-stdin ${ECR_REGISTRY}
             
-            # Login to ECR
-            aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+            cd /opt/menulogs/${ENVIRONMENT}
             
-            # Navigate to deployment directory
-            cd /opt/menulogs/\${ENVIRONMENT}
+            echo "Updating docker-compose.yml..."
+            if [ ! -f docker-compose.yml ]; then
+              echo "Error: docker-compose.yml not found"
+              exit 1
+            fi
             
-            # Force pull the specific version tag (not just 'latest' or 'prod')
-            echo "📥 Pulling specific version: \${IMAGE_URL}"
-            docker pull \${IMAGE_URL} || {
-              echo "⚠️  Failed to pull \${IMAGE_URL}, trying with environment tag..."
-              docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-              IMAGE_URL="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
-              export IMAGE_URL
-            }
+            cp docker-compose.yml docker-compose.yml.backup.$(date +%s)
+            sed -i "s|image:.*menulogs-backend[^[:space:]]*|image: ${IMAGE_URL}|g" docker-compose.yml
             
-            # Also pull latest tag to ensure it's updated
-            docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest || true
+            echo "Pulling image..."
+            docker-compose pull backend
             
-            # Stop and remove old container to force recreation
-            echo "🛑 Stopping old container..."
+            echo "Stopping existing container..."
             docker-compose stop backend || true
             docker-compose rm -f backend || true
             
-            # Update docker-compose.yml to use the specific version tag
-            # This ensures we deploy the exact version that was built
-            if [ -f docker-compose.yml ]; then
-              echo "📝 Updating docker-compose.yml with version tag..."
-              # Backup original
-              cp docker-compose.yml docker-compose.yml.backup.$(date +%s) || true
-              
-              # Update image tag - try multiple patterns
-              # Pattern 1: image: repo/menulogs-backend:tag
-              sed -i.tmp "s|image:.*menulogs-backend[^[:space:]]*|image: \${IMAGE_URL}|g" docker-compose.yml || true
-              # Pattern 2: image: repo/backend:tag  
-              sed -i.tmp "s|image:.*/backend[^[:space:]]*|image: \${IMAGE_URL}|g" docker-compose.yml || true
-              # Clean up temp file
-              rm -f docker-compose.yml.tmp || true
-              
-              echo "✅ Updated docker-compose.yml"
-              echo "   New image: \${IMAGE_URL}"
-              
-              # Verify the update worked
-              echo "🔍 Verifying docker-compose.yml update:"
-              grep "image:" docker-compose.yml | grep backend || grep "image:" docker-compose.yml
-            else
-              echo "⚠️  docker-compose.yml not found!"
-              exit 1
-            fi
+            echo "Regenerating Prisma Client..."
+            docker-compose run --rm \
+              -e PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 \
+              backend npx prisma generate || true
             
-            # Stop the container first to ensure clean deployment
-            echo "🛑 Stopping existing container..."
-            docker-compose stop backend || true
+            echo "Running database migrations..."
+            docker-compose run --rm \
+              -e PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 \
+              backend npx prisma migrate deploy || true
             
-            # Pull the specific image version using docker-compose
-            # This ensures docker-compose uses the updated image tag
-            echo "📥 Pulling image using docker-compose..."
-            if ! docker-compose pull backend; then
-              echo "❌ Failed to pull image!"
-              exit 1
-            fi
+            echo "Starting container..."
+            docker-compose up -d --force-recreate backend
             
-            # Verify the image was pulled
-            echo "🔍 Verifying image pull:"
-            docker images | grep menulogs-backend | head -3
-            
-            # Show what image will be used
-            echo "📋 Image that will be deployed:"
-            grep "image:" docker-compose.yml | grep backend || grep "image:" docker-compose.yml
-            
-            # Remove old container to force recreation
-            echo "🗑️  Removing old container..."
-            docker-compose rm -f backend || true
-            
-            # Regenerate Prisma Client (needed after Prisma 7 upgrade)
-            echo "🔄 Regenerating Prisma Client..."
-            docker-compose run --rm -e PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 backend npx prisma generate || {
-              echo "⚠️  Prisma generate failed, continuing..."
-            }
-            
-            # Run database migrations BEFORE restarting
-            # This ensures migrations are applied before the new code runs
-            echo "🔄 Running database migrations..."
-            docker-compose run --rm -e PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 backend npx prisma migrate deploy || {
-              echo "⚠️  Migration failed, continuing..."
-            }
-            
-            # Verify migrations status
-            docker-compose run --rm backend npx prisma migrate status || true
-            
-            # Force recreate the container with the new image
-            # This ensures the updated docker-compose.yml is used
-            echo "🚀 Starting backend with new image..."
-            echo "   Command: docker-compose up -d --force-recreate backend"
-            
-            # Start the container with explicit force recreate
-            if ! docker-compose up -d --force-recreate backend; then
-              echo "❌ Failed to start container!"
-              echo "📋 Checking docker-compose status:"
-              docker-compose ps
-              exit 1
-            fi
-            
-            # Wait a moment for container to start
-            echo "⏳ Waiting for container to start..."
+            echo "Waiting for container to start..."
             sleep 10
             
-            # Verify container is running
-            echo "🔍 Checking container status:"
-            docker-compose ps backend
-            
-            # Verify container is actually running
-            CONTAINER_STATUS=\$(docker-compose ps backend | grep backend | awk '{print \$4}' || echo "unknown")
-            echo "   Container status: \${CONTAINER_STATUS}"
-            
             if ! docker-compose ps backend | grep -q "Up"; then
-              echo "❌ Container failed to start!"
-              echo "📋 Container logs:"
+              echo "Error: Container failed to start"
               docker-compose logs --tail=50 backend
-              echo "📋 Docker-compose status:"
-              docker-compose ps
               exit 1
             fi
             
-            # Show container is running
-            echo "✅ Container is running!"
-            
-            # Show what image is actually running
-            echo "🔍 Verifying deployed image:"
-            RUNNING_IMAGE=\$(docker inspect \$(docker-compose ps -q backend) --format='{{.Config.Image}}' 2>/dev/null || echo "unknown")
-            echo "   Running image: \${RUNNING_IMAGE}"
-            echo "   Expected image: \${IMAGE_URL}"
-            
-            if [ "\${RUNNING_IMAGE}" != "\${IMAGE_URL}" ]; then
-              echo "⚠️  Warning: Running image doesn't match expected image!"
-              echo "   This might mean the container didn't update properly."
-            else
-              echo "✅ Image matches expected version!"
-            fi
-            
-            # Verify the container is using the correct image
-            echo "🔍 Verifying deployed image..."
-            DEPLOYED_IMAGE=\$(docker inspect \$(docker-compose ps -q backend) --format='{{.Config.Image}}' 2>/dev/null || echo "unknown")
-            echo "   Deployed image: \${DEPLOYED_IMAGE}"
-            echo "   Expected image: \${IMAGE_URL}"
-            
-            # Check health
-            echo "🏥 Checking health endpoint..."
-            sleep 5
-            HEALTH_CHECK_PASSED=false
+            echo "Checking health endpoint..."
             for i in {1..10}; do
               if curl -f -s http://localhost:5000/health > /dev/null 2>&1; then
-                echo "✅ Health check passed on attempt \$i!"
-                HEALTH_CHECK_PASSED=true
+                echo "Health check passed"
                 break
+              fi
+              if [ $i -eq 10 ]; then
+                echo "Warning: Health check failed after 10 attempts"
+                docker-compose logs --tail=30 backend
               else
-                echo "⏳ Health check attempt \$i/10 failed, retrying in 3 seconds..."
                 sleep 3
               fi
             done
             
-            if [ "\${HEALTH_CHECK_PASSED}" = "false" ]; then
-              echo "⚠️  Health check failed after 10 attempts"
-              echo "📋 Container logs:"
-              docker-compose logs --tail=30 backend
-            fi
-            
-            # Final verification - check logs for version info and code changes
-            echo "📋 Container logs (last 30 lines):"
-            docker-compose logs --tail=30 backend || true
-            
-            # Check if new code is running (look for specific log messages)
-            echo "🔍 Verifying new code is running..."
-            if docker-compose logs backend 2>/dev/null | grep -q "Redis connected\.\.\."; then
-              echo "✅ New code detected! (Redis connected with dots)"
-            elif docker-compose logs backend 2>/dev/null | grep -q "Redis connected"; then
-              echo "⚠️  Old code detected! (Redis connected without dots)"
-              echo "   Container might not have updated properly."
-            else
-              echo "⚠️  Could not verify code version from logs"
-            fi
-            
-            echo "✅ Deployment successful!"
-          EOF
+            RUNNING_IMAGE=$(docker inspect $(docker-compose ps -q backend) --format='{{.Config.Image}}' 2>/dev/null)
+            echo "Deployed image: ${RUNNING_IMAGE}"
+          DEPLOY_SCRIPT
 
       - name: Deployment Summary
         run: |
-          echo "## 🚀 Backend Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment:** ${{ env.ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Image:** ${{ steps.build-image.outputs.image }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version Tag:** ${{ steps.build-image.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Prod Tag:** ${{ steps.build-image.outputs.prod_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.build-image.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-
