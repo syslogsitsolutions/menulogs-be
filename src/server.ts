@@ -19,7 +19,7 @@ const startServer = async () => {
 
     // Test Redis connection
     await redis.ping();
-    logger.info('✅ Redis connected...');
+    logger.info('✅ Redis connected');
 
     // Initialize scheduled jobs
     initializeMonthlyUsageResetJob();
