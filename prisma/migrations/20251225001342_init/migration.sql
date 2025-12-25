@@ -5,7 +5,7 @@ CREATE TYPE "Role" AS ENUM ('OWNER', 'MANAGER', 'STAFF', 'ADMIN');
 CREATE TYPE "SubscriptionStatus" AS ENUM ('TRIAL', 'ACTIVE', 'INACTIVE', 'EXPIRED', 'CANCELLED');
 
 -- CreateEnum
-CREATE TYPE "SubscriptionPlan" AS ENUM ('FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE');
+CREATE TYPE "SubscriptionPlan" AS ENUM ('FREE', 'STANDARD', 'PROFESSIONAL', 'CUSTOM');
 
 -- CreateEnum
 CREATE TYPE "Availability" AS ENUM ('IN_STOCK', 'OUT_OF_STOCK', 'HIDDEN');
@@ -47,6 +47,18 @@ CREATE TABLE "sessions" (
 );
 
 -- CreateTable
+CREATE TABLE "password_reset_tokens" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "used" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "password_reset_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "businesses" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -55,6 +67,14 @@ CREATE TABLE "businesses" (
     "ownerId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "brandDescription" TEXT,
+    "facebookUrl" TEXT,
+    "instagramUrl" TEXT,
+    "twitterUrl" TEXT,
+    "linkedinUrl" TEXT,
+    "youtubeUrl" TEXT,
+    "aboutContent" TEXT,
+    "aboutImage" TEXT,
 
     CONSTRAINT "businesses_pkey" PRIMARY KEY ("id")
 );
@@ -64,6 +84,7 @@ CREATE TABLE "locations" (
     "id" TEXT NOT NULL,
     "businessId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
     "address" TEXT NOT NULL,
     "city" TEXT NOT NULL,
     "state" TEXT NOT NULL,
@@ -78,6 +99,19 @@ CREATE TABLE "locations" (
     "openingHours" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "contactContent" TEXT,
+    "contactImage" TEXT,
+    "mapEmbedUrl" TEXT,
+    "brandColor" TEXT DEFAULT '#ee6620',
+    "currentMenuItems" INTEGER NOT NULL DEFAULT 0,
+    "currentCategories" INTEGER NOT NULL DEFAULT 0,
+    "currentBanners" INTEGER NOT NULL DEFAULT 0,
+    "currentFeaturedSections" INTEGER NOT NULL DEFAULT 0,
+    "currentStorageBytes" BIGINT NOT NULL DEFAULT 0,
+    "monthlyImageUploads" INTEGER NOT NULL DEFAULT 0,
+    "monthlyVideoUploads" INTEGER NOT NULL DEFAULT 0,
+    "monthlyUploadResetDate" TIMESTAMP(3),
+    "lastUsageUpdate" TIMESTAMP(3),
 
     CONSTRAINT "locations_pkey" PRIMARY KEY ("id")
 );
@@ -144,6 +178,25 @@ CREATE TABLE "banners" (
 );
 
 -- CreateTable
+CREATE TABLE "featured_sections" (
+    "id" TEXT NOT NULL,
+    "locationId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "image" TEXT NOT NULL,
+    "features" JSONB NOT NULL,
+    "buttonText" TEXT,
+    "buttonLink" TEXT,
+    "imagePosition" TEXT NOT NULL DEFAULT 'left',
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "featured_sections_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "subscriptions" (
     "id" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
@@ -160,6 +213,16 @@ CREATE TABLE "subscriptions" (
     "razorpayPlanId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "teamMemberLimit" INTEGER NOT NULL DEFAULT 2,
+    "customDomainEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "apiAccessEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "whiteLabelEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "ssoEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "gracePeriodEndsAt" TIMESTAMP(3),
+    "gracePeriodStatus" TEXT,
+    "lastPaymentAttempt" TIMESTAMP(3),
+    "paymentRetryCount" INTEGER NOT NULL DEFAULT 0,
+    "dunningStatus" TEXT,
 
     CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id")
 );
@@ -280,13 +343,34 @@ CREATE INDEX "sessions_refreshToken_idx" ON "sessions"("refreshToken");
 CREATE INDEX "sessions_expiresAt_idx" ON "sessions"("expiresAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "password_reset_tokens_token_key" ON "password_reset_tokens"("token");
+
+-- CreateIndex
+CREATE INDEX "password_reset_tokens_userId_idx" ON "password_reset_tokens"("userId");
+
+-- CreateIndex
+CREATE INDEX "password_reset_tokens_token_idx" ON "password_reset_tokens"("token");
+
+-- CreateIndex
+CREATE INDEX "password_reset_tokens_expiresAt_idx" ON "password_reset_tokens"("expiresAt");
+
+-- CreateIndex
 CREATE INDEX "businesses_ownerId_idx" ON "businesses"("ownerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "locations_slug_key" ON "locations"("slug");
 
 -- CreateIndex
 CREATE INDEX "locations_businessId_idx" ON "locations"("businessId");
 
 -- CreateIndex
 CREATE INDEX "locations_subscriptionStatus_idx" ON "locations"("subscriptionStatus");
+
+-- CreateIndex
+CREATE INDEX "locations_slug_idx" ON "locations"("slug");
+
+-- CreateIndex
+CREATE INDEX "locations_trialEndsAt_idx" ON "locations"("trialEndsAt");
 
 -- CreateIndex
 CREATE INDEX "categories_locationId_idx" ON "categories"("locationId");
@@ -310,6 +394,12 @@ CREATE INDEX "banners_locationId_idx" ON "banners"("locationId");
 CREATE INDEX "banners_isActive_idx" ON "banners"("isActive");
 
 -- CreateIndex
+CREATE INDEX "featured_sections_locationId_idx" ON "featured_sections"("locationId");
+
+-- CreateIndex
+CREATE INDEX "featured_sections_isActive_idx" ON "featured_sections"("isActive");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "subscriptions_locationId_key" ON "subscriptions"("locationId");
 
 -- CreateIndex
@@ -320,6 +410,15 @@ CREATE INDEX "subscriptions_locationId_idx" ON "subscriptions"("locationId");
 
 -- CreateIndex
 CREATE INDEX "subscriptions_status_idx" ON "subscriptions"("status");
+
+-- CreateIndex
+CREATE INDEX "subscriptions_endDate_idx" ON "subscriptions"("endDate");
+
+-- CreateIndex
+CREATE INDEX "subscriptions_nextBillingDate_idx" ON "subscriptions"("nextBillingDate");
+
+-- CreateIndex
+CREATE INDEX "subscriptions_gracePeriodEndsAt_idx" ON "subscriptions"("gracePeriodEndsAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "invoices_razorpayInvoiceId_key" ON "invoices"("razorpayInvoiceId");
@@ -370,6 +469,9 @@ CREATE INDEX "uploads_entityType_entityId_idx" ON "uploads"("entityType", "entit
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "businesses" ADD CONSTRAINT "businesses_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -386,6 +488,9 @@ ALTER TABLE "menu_items" ADD CONSTRAINT "menu_items_categoryId_fkey" FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE "banners" ADD CONSTRAINT "banners_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "locations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "featured_sections" ADD CONSTRAINT "featured_sections_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "locations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "locations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
