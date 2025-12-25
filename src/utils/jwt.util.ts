@@ -2,13 +2,15 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1m';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
 export interface JWTPayload {
   userId: string;
-  email: string;
+  email?: string;
   role: string;
+  staffId?: string;
+  locationId?: string;
 }
 
 export const generateAccessToken = (payload: JWTPayload): string => {

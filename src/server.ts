@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import http from 'http';
 import app from './app';
 import prisma from './config/database';
 import redis from './config/redis';
@@ -8,6 +9,7 @@ import logger from './utils/logger.util';
 import { initializeMonthlyUsageResetJob } from './jobs/monthlyUsageReset.job';
 import { initializeSubscriptionExpiryJob } from './jobs/subscriptionExpiry.job';
 import { initializeTrialExpiryJob } from './jobs/trialExpiry.job';
+import { initializeSocket } from './socket';
 
 const PORT = process.env.PORT || 5000;
 
@@ -21,14 +23,22 @@ const startServer = async () => {
     await redis.ping();
     logger.info('✅ Redis connected...');
 
+    // Create HTTP server
+    const httpServer = http.createServer(app);
+
+    // Initialize Socket.IO
+    await initializeSocket(httpServer);
+    logger.info('✅ Socket.IO initialized...');
+
     // Initialize scheduled jobs
     initializeMonthlyUsageResetJob();
     initializeSubscriptionExpiryJob();
     initializeTrialExpiryJob();
 
     // Start server
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       logger.info(`🚀 Server running on http://localhost:${PORT}`);
+      logger.info(`🔌 WebSocket server ready`);
       logger.info(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (error) {

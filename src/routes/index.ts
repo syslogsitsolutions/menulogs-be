@@ -12,6 +12,10 @@ import paymentRoutes from './payment.routes';
 import paymentMethodRoutes from './paymentMethod.routes';
 import qrcodeRoutes from './qrcode.routes';
 import uploadRoutes from './upload.routes';
+import tableRoutes from './table.routes';
+import orderRoutes from './order.routes';
+import staffRoutes from './staff.routes';
+import metricsRoutes from './metrics.routes';
 
 const router = Router();
 
@@ -31,6 +35,14 @@ router.use('/payments', paymentRoutes);
 router.use('/payment-methods', paymentMethodRoutes);
 router.use('/qrcode', qrcodeRoutes);
 router.use('/upload', uploadRoutes);
+
+// Order Management routes
+router.use('/', tableRoutes);
+router.use('/', orderRoutes);
+router.use('/', staffRoutes);
+
+// Metrics & Monitoring
+router.use('/metrics', metricsRoutes);
 
 // API info
 router.get('/', (_req, res) => {
@@ -52,6 +64,11 @@ router.get('/', (_req, res) => {
       paymentMethods: '/api/v1/payment-methods',
       qrcode: '/api/v1/qrcode',
       upload: '/api/v1/upload',
+      // Order Management
+      tables: '/api/v1/locations/:locationId/tables',
+      orders: '/api/v1/locations/:locationId/orders',
+      staff: '/api/v1/locations/:locationId/staff',
+      kitchenOrders: '/api/v1/locations/:locationId/kitchen-orders',
     },
   });
 });
