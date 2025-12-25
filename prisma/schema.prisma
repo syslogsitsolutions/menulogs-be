@@ -29,6 +29,9 @@ model User {
   activities          Activity[]
   paymentMethods      PaymentMethod[]
   passwordResetTokens PasswordResetToken[]
+  staff               Staff[]
+  ordersCreated       Order[]              @relation("OrderCreatedBy")
+  ordersServed        Order[]              @relation("OrderServedBy")
 
   @@index([email])
   @@map("users")
@@ -146,6 +149,14 @@ model Location {
   monthlyUploadResetDate  DateTime?
   lastUsageUpdate         DateTime?
 
+  // Order settings
+  taxRate           Decimal?  @db.Decimal(5, 2) @default(0)
+  serviceChargeRate Decimal?  @db.Decimal(5, 2) @default(0)
+  orderPrefix       String?   @default("ORD")
+  enableDineIn      Boolean   @default(true)
+  enableTakeaway    Boolean   @default(true)
+  enableDelivery    Boolean   @default(false)
+
   // Relations
   business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   categories       Category[]
@@ -154,6 +165,9 @@ model Location {
   featuredSections FeaturedSection[]
   subscription     Subscription?
   analytics        Analytics[]
+  tables           Table[]
+  orders           Order[]
+  staff            Staff[]
 
   @@index([businessId])
   @@index([subscriptionStatus])
@@ -175,6 +189,241 @@ enum SubscriptionPlan {
   STANDARD
   PROFESSIONAL
   CUSTOM
+}
+
+// ==================== TABLE MANAGEMENT ====================
+
+model Table {
+  id         String      @id @default(uuid())
+  locationId String
+  number     Int
+  name       String?
+  capacity   Int         @default(4)
+  status     TableStatus @default(AVAILABLE)
+  qrCode     String?
+  sortOrder  Int         @default(0)
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  // Relations
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  orders   Order[]
+
+  @@unique([locationId, number])
+  @@index([locationId])
+  @@index([status])
+  @@map("tables")
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
+// ==================== ORDER MANAGEMENT ====================
+
+model Order {
+  id             String        @id @default(uuid())
+  locationId     String
+  tableId        String?
+  orderNumber    Int // Sequential per location per day
+  type           OrderType     @default(DINE_IN)
+  status         OrderStatus   @default(PENDING)
+  customerName   String?
+  customerPhone  String?
+  customerEmail  String?
+
+  // Timing
+  createdAt      DateTime      @default(now())
+  confirmedAt    DateTime?
+  preparingAt    DateTime?
+  readyAt        DateTime?
+  servedAt       DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+
+  // Financials
+  subtotal       Decimal       @db.Decimal(10, 2)
+  taxAmount      Decimal       @db.Decimal(10, 2) @default(0)
+  discountAmount Decimal       @db.Decimal(10, 2) @default(0)
+  tipAmount      Decimal       @db.Decimal(10, 2) @default(0)
+  totalAmount    Decimal       @db.Decimal(10, 2)
+  paymentStatus  PaymentStatus @default(PENDING)
+  paymentMethod  String?
+
+  // Staff
+  createdById    String
+  servedById     String?
+
+  // Notes & Metadata
+  notes          String?
+  specialRequests String?
+  metadata       Json?
+
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  location  Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  table     Table?          @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  items     OrderItem[]
+  timeline  OrderTimeline[]
+  payments  OrderPayment[]
+  createdBy User            @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  servedBy  User?           @relation("OrderServedBy", fields: [servedById], references: [id])
+
+  @@index([locationId])
+  @@index([tableId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([orderNumber])
+  @@map("orders")
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+model OrderItem {
+  id              String          @id @default(uuid())
+  orderId         String
+  menuItemId      String
+  quantity        Int             @default(1)
+  unitPrice       Decimal         @db.Decimal(10, 2)
+  totalPrice      Decimal         @db.Decimal(10, 2)
+  status          OrderItemStatus @default(PENDING)
+  notes           String?
+  modifiers       Json?
+
+  // Kitchen tracking
+  sentToKitchenAt DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@index([orderId])
+  @@index([menuItemId])
+  @@index([status])
+  @@map("order_items")
+}
+
+enum OrderItemStatus {
+  PENDING
+  SENT_TO_KITCHEN
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+}
+
+model OrderTimeline {
+  id          String   @id @default(uuid())
+  orderId     String
+  action      String
+  description String
+  userId      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("order_timeline")
+}
+
+model OrderPayment {
+  id            String   @id @default(uuid())
+  orderId       String
+  amount        Decimal  @db.Decimal(10, 2)
+  method        String
+  status        String   @default("completed")
+  transactionId String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_payments")
+}
+
+// ==================== STAFF MANAGEMENT ====================
+
+model Staff {
+  id         String    @id @default(uuid())
+  locationId String
+  userId     String?
+  name       String
+  email      String?
+  phone      String?
+  role       StaffRole @default(WAITER)
+  pin        String?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  location Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  user     User?        @relation(fields: [userId], references: [id])
+  shifts   StaffShift[]
+
+  @@unique([locationId, pin])
+  @@index([locationId])
+  @@index([userId])
+  @@map("staff")
+}
+
+enum StaffRole {
+  MANAGER
+  CASHIER
+  WAITER
+  KITCHEN
+}
+
+model StaffShift {
+  id        String    @id @default(uuid())
+  staffId   String
+  clockIn   DateTime
+  clockOut  DateTime?
+  notes     String?
+  createdAt DateTime  @default(now())
+
+  // Relations
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+  @@index([clockIn])
+  @@map("staff_shifts")
 }
 
 // ==================== MENU CONTENT ====================
@@ -225,9 +474,10 @@ model MenuItem {
   updatedAt       DateTime     @updatedAt
 
   // Relations
-  location Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  category Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  views    MenuItemView[]
+  location   Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  category   Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  views      MenuItemView[]
+  orderItems OrderItem[]
 
   @@index([locationId])
   @@index([categoryId])
