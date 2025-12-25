@@ -11,6 +11,7 @@ import routes from './routes';
 
 const app: Application = express();
 
+app.set('trust proxy', true);
 // CORS configuration - MUST be before all other middleware
 // When credentials are included, cannot use wildcard origin - must specify exact origins
 const allowedOrigins = [
