@@ -111,8 +111,12 @@ jobs:
 
       - name: Extract and deploy
         run: |
-          ssh ubuntu@${{ secrets.EC2_DEV_HOST }} 'bash -l' << 'EOF'
+          ssh ubuntu@${{ secrets.EC2_DEV_HOST }} << 'EOF'
             set -e
+            # Source NVM to make npm/node available
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            
             cd /opt/menulogs/dev/app
             
             # Extract new code
