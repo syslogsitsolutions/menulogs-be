@@ -1,0 +1,354 @@
+name: Backend CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main      # Production deployments
+      - develop   # Development deployments
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - development
+      skip_tests:
+        description: 'Skip tests'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '20'
+  AWS_REGION: ap-south-1
+
+jobs:
+  # Lint and Test Job
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Run tests
+        if: ${{ !inputs.skip_tests || github.event_name != 'workflow_dispatch' }}
+        run: npm test
+        continue-on-error: true
+        env:
+          NODE_ENV: test
+
+      - name: Check TypeScript compilation
+        run: npm run build
+
+  # Build Job
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Create deployment artifact
+        run: |
+          tar -czf backend-deploy.tar.gz \
+            --exclude='node_modules' \
+            --exclude='.git' \
+            --exclude='.env*' \
+            --exclude='dist' \
+            --exclude='*.log' \
+            --exclude='coverage' \
+            --exclude='.vscode' \
+            --exclude='.idea' \
+            src/ \
+            prisma/ \
+            package.json \
+            package-lock.json \
+            tsconfig.json \
+            prisma.config.js \
+            prisma.config.ts \
+            ecosystem.config.js \
+            README.md
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build
+          path: backend-deploy.tar.gz
+          retention-days: 1
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: |
+      (github.ref == 'refs/heads/main' || 
+       (github.event_name == 'workflow_dispatch' && inputs.environment == 'production'))
+    environment:
+      name: production
+      url: https://api.menulogs.in
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: ./
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY}}
+
+      - name: Add EC2 to known hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.EC2_PROD_HOST}} >> ~/.ssh/known_hosts
+
+      - name: Create deployment directory
+        run: |
+          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} \
+            "mkdir -p /opt/menulogs/prod/app/backend-backup"
+
+      - name: Backup current deployment
+        run: |
+          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} \
+            "if [ -d /opt/menulogs/prod/app/backend ]; then
+               cp -r /opt/menulogs/prod/app/backend /opt/menulogs/prod/app/backend-backup/$(date +%Y%m%d_%H%M%S)
+             fi"
+
+      - name: Upload code to EC2
+        run: |
+          scp backend-deploy.tar.gz \
+            ubuntu@${{ secrets.EC2_PROD_HOST}}:/opt/menulogs/prod/app/
+
+      - name: Extract and deploy
+        run: |
+          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} << 'EOF'
+            set -e
+            cd /opt/menulogs/prod/app
+            
+            # Extract new code
+            tar -xzf backend-deploy.tar.gz -C backend/
+            rm backend-deploy.tar.gz
+            
+            # Navigate to backend directory
+            cd backend
+            
+            # Install dependencies
+            npm install --production=false
+            
+            # Generate Prisma Client
+            npx prisma generate
+            
+            # Build application
+            npm run build
+            
+            # Run database migrations
+            npx prisma migrate deploy
+            
+            # Restart application with PM2 (zero-downtime)
+            pm2 reload menulogs-backend-prod || pm2 start ecosystem.config.js
+            
+            # Save PM2 process list
+            pm2 save
+          EOF
+
+      - name: Health check
+        run: |
+          sleep 10
+          for i in {1..30}; do
+            if curl -f https://api.menulogs.in/health; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            echo "⏳ Waiting for application to be ready... ($i/30)"
+            sleep 5
+          done
+          echo "❌ Health check failed"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} << 'EOF'
+            set -e
+            echo "🔄 Rolling back to previous version..."
+            
+            # Find latest backup
+            LATEST_BACKUP=$(ls -t /opt/menulogs/prod/app/backend-backup/ | head -1)
+            
+            if [ -n "$LATEST_BACKUP" ]; then
+              # Restore backup
+              rm -rf /opt/menulogs/prod/app/backend
+              cp -r /opt/menulogs/prod/app/backend-backup/$LATEST_BACKUP /opt/menulogs/prod/app/backend
+              
+              # Restart application
+              cd /opt/menulogs/prod/app/backend
+              pm2 restart menulogs-backend-prod
+              
+              echo "✅ Rollback completed"
+            else
+              echo "❌ No backup found for rollback"
+            fi
+          EOF
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## 🚀 Backend Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** Production" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Server:** ${{ secrets.EC2_PROD_HOST}}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+
+  # Deploy to Development
+  deploy-development:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: build
+    if: |
+      (github.ref == 'refs/heads/develop' || 
+       (github.event_name == 'workflow_dispatch' && inputs.environment == 'development'))
+    environment:
+      name: development
+      url: https://api-dev.menulogs.in
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: ./
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_DEV_SSH_PRIVATE_KEY }}
+
+      - name: Add EC2 to known hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.EC2_DEV_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create deployment directory
+        run: |
+          ssh ubuntu@${{ secrets.EC2_DEV_HOST }} \
+            "mkdir -p /opt/menulogs/dev/app/backend-backup"
+
+      - name: Backup current deployment
+        run: |
+          ssh ubuntu@${{ secrets.EC2_DEV_HOST }} \
+            "if [ -d /opt/menulogs/dev/app/backend ]; then
+               cp -r /opt/menulogs/dev/app/backend /opt/menulogs/dev/app/backend-backup/$(date +%Y%m%d_%H%M%S)
+             fi"
+
+      - name: Upload code to EC2
+        run: |
+          scp backend-deploy.tar.gz \
+            ubuntu@${{ secrets.EC2_DEV_HOST }}:/opt/menulogs/dev/app/
+
+      - name: Extract and deploy
+        run: |
+          ssh ubuntu@${{ secrets.EC2_DEV_HOST }} << 'EOF'
+            set -e
+            cd /opt/menulogs/dev/app
+            
+            # Extract new code
+            tar -xzf backend-deploy.tar.gz -C backend/
+            rm backend-deploy.tar.gz
+            
+            # Navigate to backend directory
+            cd backend
+            
+            # Install dependencies
+            npm install --production=false
+            
+            # Generate Prisma Client
+            npx prisma generate
+            
+            # Build application
+            npm run build
+            
+            # Run database migrations
+            npx prisma migrate deploy
+            
+            # Restart application with PM2
+            pm2 reload menulogs-backend-dev || pm2 start ecosystem.config.js
+            
+            # Save PM2 process list
+            pm2 save
+          EOF
+
+      - name: Health check
+        run: |
+          sleep 10
+          for i in {1..30}; do
+            if curl -f https://api-dev.menulogs.in/health; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            echo "⏳ Waiting for application to be ready... ($i/30)"
+            sleep 5
+          done
+          echo "❌ Health check failed"
+          exit 1
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## 🚀 Backend Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** Development" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Server:** ${{ secrets.EC2_DEV_HOST }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
