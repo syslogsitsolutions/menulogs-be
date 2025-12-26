@@ -1,12 +1,12 @@
-name: Backend Production Deployment
+name: Backend Development Deployment
 
 on:
   push:
     branches:
-      - main
+      - develop
   pull_request:
     branches:
-      - main
+      - develop
   workflow_dispatch:
 
 env:
@@ -61,18 +61,18 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: backend-build
+          name: backend-build-dev
           path: backend-deploy.tar.gz
           retention-days: 1
 
-  # Deploy to Production
+  # Deploy to Development
   deploy:
-    name: Deploy to Production
+    name: Deploy to Development
     runs-on: ubuntu-latest
     needs: build
     environment:
-      name: production
-      url: https://api.menulogs.in
+      name: development
+      url: https://api-dev.menulogs.in
     
     steps:
       - name: Checkout code
@@ -81,40 +81,40 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: backend-build
+          name: backend-build-dev
           path: ./
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY}}
+          ssh-private-key: ${{ secrets.EC2_DEV_SSH_PRIVATE_KEY }}
 
       - name: Add EC2 to known hosts
         run: |
-          ssh-keyscan -H ${{ secrets.EC2_PROD_HOST}} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.EC2_DEV_HOST }} >> ~/.ssh/known_hosts
 
       - name: Create deployment directory
         run: |
-          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} \
-            "mkdir -p /opt/menulogs/prod/app/backend-backup"
+          ssh ubuntu@${{ secrets.EC2_DEV_HOST }} \
+            "mkdir -p /opt/menulogs/dev/app/backend-backup"
 
       - name: Backup current deployment
         run: |
-          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} \
-            "if [ -d /opt/menulogs/prod/app/backend ]; then
-               cp -r /opt/menulogs/prod/app/backend /opt/menulogs/prod/app/backend-backup/$(date +%Y%m%d_%H%M%S)
+          ssh ubuntu@${{ secrets.EC2_DEV_HOST }} \
+            "if [ -d /opt/menulogs/dev/app/backend ]; then
+               cp -r /opt/menulogs/dev/app/backend /opt/menulogs/dev/app/backend-backup/$(date +%Y%m%d_%H%M%S)
              fi"
 
       - name: Upload code to EC2
         run: |
           scp backend-deploy.tar.gz \
-            ubuntu@${{ secrets.EC2_PROD_HOST}}:/opt/menulogs/prod/app/
+            ubuntu@${{ secrets.EC2_DEV_HOST }}:/opt/menulogs/dev/app/
 
       - name: Extract and deploy
         run: |
-          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} << 'EOF'
+          ssh ubuntu@${{ secrets.EC2_DEV_HOST }} << 'EOF'
             set -e
-            cd /opt/menulogs/prod/app
+            cd /opt/menulogs/dev/app
             
             # Extract new code
             tar -xzf backend-deploy.tar.gz -C backend/
@@ -135,9 +135,9 @@ jobs:
             # Run database migrations
             npx prisma migrate deploy
             
-            # Restart application with PM2 (zero-downtime)
-            cd /opt/menulogs/prod
-            pm2 reload menulogs-backend-prod || PM2_APP_NAME=menulogs-backend-prod PM2_CWD=/opt/menulogs/prod pm2 start app/backend/ecosystem.config.js --update-env
+            # Restart application with PM2
+            cd /opt/menulogs/dev
+            pm2 reload menulogs-backend-dev || PM2_APP_NAME=menulogs-backend-dev PM2_CWD=/opt/menulogs/dev pm2 start app/backend/ecosystem.config.js --update-env
             
             # Save PM2 process list
             pm2 save
@@ -147,7 +147,7 @@ jobs:
         run: |
           sleep 10
           for i in {1..30}; do
-            if curl -f https://api.menulogs.in/health; then
+            if curl -f https://api-dev.menulogs.in/health; then
               echo "✅ Health check passed"
               exit 0
             fi
@@ -157,39 +157,14 @@ jobs:
           echo "❌ Health check failed"
           exit 1
 
-      - name: Rollback on failure
-        if: failure()
-        run: |
-          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} << 'EOF'
-            set -e
-            echo "🔄 Rolling back to previous version..."
-            
-            # Find latest backup
-            LATEST_BACKUP=$(ls -t /opt/menulogs/prod/app/backend-backup/ | head -1)
-            
-            if [ -n "$LATEST_BACKUP" ]; then
-              # Restore backup
-              rm -rf /opt/menulogs/prod/app/backend
-              cp -r /opt/menulogs/prod/app/backend-backup/$LATEST_BACKUP /opt/menulogs/prod/app/backend
-              
-              # Restart application
-              cd /opt/menulogs/prod/app/backend
-              pm2 restart menulogs-backend-prod
-              
-              echo "✅ Rollback completed"
-            else
-              echo "❌ No backup found for rollback"
-            fi
-          EOF
-
       - name: Deployment Summary
         if: always()
         run: |
           echo "## 🚀 Backend Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** Production" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** Development" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Server:** ${{ secrets.EC2_PROD_HOST}}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Server:** ${{ secrets.EC2_DEV_HOST }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+
