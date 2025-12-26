@@ -32,9 +32,9 @@ router.get(
 // PUT route: require subscription, check storage limit (if updating images)
 router.put(
   '/:id',
+  uploadFields, // Parse FormData first so req.body.locationId is available
   requireActiveSubscription,
   checkStorageLimit,
-  uploadFields,
   menuItemController.update.bind(menuItemController)
 );
 

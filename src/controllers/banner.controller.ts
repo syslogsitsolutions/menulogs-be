@@ -171,11 +171,12 @@ export class BannerController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId; // Already validated by requireActiveSubscription middleware
       const file = req.file; // Image file from multipart/form-data
       let bodyData = req.body;
 
       const existing = await prisma.banner.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -212,16 +213,13 @@ export class BannerController {
           }
         }
 
-        // Get locationId from existing banner
-        const bannerLocation = existing.locationId;
-        
         const result = await uploadToS3({
           file: processedFile,
           entityType: 'banner',
           entityId: id,
           userId,
           filename: 'image',
-          locationId: bannerLocation,
+          locationId: locationId,
         });
 
         imageUrl = result.url;
@@ -270,9 +268,15 @@ export class BannerController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId;
+
+      if (!locationId) {
+        res.status(400).json({ error: 'Location ID is required in request body' });
+        return;
+      }
 
       const existing = await prisma.banner.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -288,8 +292,7 @@ export class BannerController {
         }
       }
 
-      // Get location info before deletion
-      const locationId = existing.locationId;
+      // Get location info before deletion (locationId already from request body)
       const location = await prisma.location.findUnique({
         where: { id: locationId },
         select: { slug: true },
@@ -314,9 +317,15 @@ export class BannerController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId;
+
+      if (!locationId) {
+        res.status(400).json({ error: 'Location ID is required in request body' });
+        return;
+      }
 
       const existing = await prisma.banner.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -331,10 +340,10 @@ export class BannerController {
 
       // Clear menu cache for this location
       const location = await prisma.location.findUnique({
-        where: { id: existing.locationId },
+        where: { id: locationId },
         select: { slug: true },
       });
-      await clearMenuCache(existing.locationId, location?.slug);
+      await clearMenuCache(locationId, location?.slug);
 
       res.json({ message: 'Banner status updated', banner });
     } catch (error) {

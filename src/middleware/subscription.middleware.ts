@@ -54,7 +54,7 @@ export const requireActiveSubscription = async (
     // Get locationId from params or body (must be provided by client)
     const locationId = req.params.locationId || req.body.locationId;
     if (!locationId) {
-      res.status(400).json({ error: 'Location ID is required in params or body' });
+      res.status(400).json({ error: 'Internal server error' });
       return;
     }
 
@@ -153,7 +153,7 @@ export const checkPlanLimit = (
       // Get locationId from params or body (must be provided by client)
       const locationId = req.params.locationId || req.body.locationId;
       if (!locationId) {
-        res.status(400).json({ error: 'Location ID is required in params or body' });
+        res.status(400).json({ error: 'Internal server error' });
         return;
       }
 
@@ -265,7 +265,7 @@ export const checkMonthlyUploadLimit = (uploadType: 'image' | 'video') => {
       // Get locationId from params or body (must be provided by client)
       const locationId = req.params.locationId || req.body.locationId;
       if (!locationId) {
-        res.status(400).json({ error: 'Location ID is required in params or body' });
+        res.status(400).json({ error: 'Internal server error' });
         return;
       }
 
@@ -328,7 +328,7 @@ export const requireFeature = (feature: string) => {
       // Get locationId from params or body (must be provided by client)
       const locationId = req.params.locationId || req.body.locationId;
       if (!locationId) {
-        res.status(400).json({ error: 'Location ID is required in params or body' });
+        res.status(400).json({ error: 'Internal server error' });
         return;
       }
 

@@ -27,9 +27,9 @@ router.get(
 );
 router.put(
   '/:id',
+  uploadSingle, // Parse FormData first so req.body.locationId is available
   requireActiveSubscription,
   checkStorageLimit,
-  uploadSingle,
   bannerController.update.bind(bannerController)
 );
 router.delete(

@@ -270,11 +270,12 @@ export class FeaturedSectionController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId; // Already validated by requireActiveSubscription middleware
       const file = req.file; // Image file from multipart/form-data
       let bodyData = req.body;
 
       const existing = await prisma.featuredSection.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -311,16 +312,13 @@ export class FeaturedSectionController {
           }
         }
 
-        // Get locationId from existing section
-        const sectionLocation = existing.locationId;
-        
         const result = await uploadToS3({
           file: processedFile,
           entityType: 'featured-section',
           entityId: id,
           userId,
           filename: 'image',
-          locationId: sectionLocation,
+          locationId: locationId,
         });
 
         imageUrl = result.url;
@@ -381,9 +379,15 @@ export class FeaturedSectionController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId;
+
+      if (!locationId) {
+        res.status(400).json({ error: 'Location ID is required in request body' });
+        return;
+      }
 
       const existing = await prisma.featuredSection.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -399,8 +403,7 @@ export class FeaturedSectionController {
         }
       }
 
-      // Get location info before deletion
-      const locationId = existing.locationId;
+      // Get location info before deletion (locationId already from request body)
       const location = await prisma.location.findUnique({
         where: { id: locationId },
         select: { slug: true },
@@ -425,9 +428,15 @@ export class FeaturedSectionController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId;
+
+      if (!locationId) {
+        res.status(400).json({ error: 'Location ID is required in request body' });
+        return;
+      }
 
       const existing = await prisma.featuredSection.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -442,10 +451,10 @@ export class FeaturedSectionController {
 
       // Clear menu cache for this location
       const location = await prisma.location.findUnique({
-        where: { id: existing.locationId },
+        where: { id: locationId },
         select: { slug: true },
       });
-      await clearFeaturedSectionCache(existing.locationId, location?.slug);
+      await clearFeaturedSectionCache(locationId, location?.slug);
 
       res.json({ message: 'Featured section status updated', featuredSection });
     } catch (error) {

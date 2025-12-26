@@ -178,11 +178,12 @@ export class CategoryController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId; // Already validated by requireActiveSubscription middleware
       const file = req.file; // Image file from multipart/form-data
       let bodyData = req.body;
 
       const existing = await prisma.category.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -219,16 +220,13 @@ export class CategoryController {
           }
         }
 
-        // Get locationId from existing category
-        const categoryLocation = existing.locationId;
-        
         const result = await uploadToS3({
           file: processedFile,
           entityType: 'category',
           entityId: id,
           userId,
           filename: 'image',
-          locationId: categoryLocation,
+          locationId: locationId,
         });
 
         imageUrl = result.url;
@@ -276,9 +274,15 @@ export class CategoryController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId;
+
+      if (!locationId) {
+        res.status(400).json({ error: 'Location ID is required in request body' });
+        return;
+      }
 
       const existing = await prisma.category.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -294,8 +298,7 @@ export class CategoryController {
         }
       }
 
-      // Get location info before deletion
-      const locationId = existing.locationId;
+      // Get location info before deletion (locationId already from request body)
       const location = await prisma.location.findUnique({
         where: { id: locationId },
         select: { slug: true },
@@ -320,9 +323,15 @@ export class CategoryController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId;
+
+      if (!locationId) {
+        res.status(400).json({ error: 'Location ID is required in request body' });
+        return;
+      }
 
       const existing = await prisma.category.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -337,10 +346,10 @@ export class CategoryController {
 
       // Clear menu cache for this location
       const location = await prisma.location.findUnique({
-        where: { id: existing.locationId },
+        where: { id: locationId },
         select: { slug: true },
       });
-      await clearMenuCache(existing.locationId, location?.slug);
+      await clearMenuCache(locationId, location?.slug);
 
       res.json({ message: 'Visibility updated', category });
     } catch (error) {
