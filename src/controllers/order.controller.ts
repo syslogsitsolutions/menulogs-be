@@ -234,7 +234,7 @@ export class OrderController {
       // Calculate totals
       const { subtotal, taxAmount, totalAmount } = this.calculateTotals(
         orderItems,
-        location.taxRate
+        null // TODO: Add taxRate to Location model if needed
       );
 
       // Determine initial status: CONFIRMED if sent directly to kitchen, PENDING if needs confirmation
@@ -569,7 +569,7 @@ export class OrderController {
 
       const { subtotal, taxAmount, totalAmount } = this.calculateTotals(
         items,
-        existing.location.taxRate
+        null // TODO: Add taxRate to Location model if needed
       );
 
       const order = await prisma.order.update({
@@ -643,7 +643,7 @@ export class OrderController {
 
       const { subtotal, taxAmount, totalAmount } = this.calculateTotals(
         items,
-        item.order.location.taxRate
+        null // TODO: Add taxRate to Location model if needed
       );
 
       await prisma.order.update({

@@ -168,7 +168,7 @@ export class StaffController {
       const staff = await prisma.staff.create({
         data: {
           ...data,
-          pin: hashedPin,
+          pin: hashedPin || '',
           locationId,
         },
         include: {

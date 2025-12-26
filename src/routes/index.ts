@@ -16,6 +16,7 @@ import tableRoutes from './table.routes';
 import orderRoutes from './order.routes';
 import staffRoutes from './staff.routes';
 import metricsRoutes from './metrics.routes';
+import printRoutes from './print.routes';
 
 const router = Router();
 
@@ -40,6 +41,7 @@ router.use('/upload', uploadRoutes);
 router.use('/', tableRoutes);
 router.use('/', orderRoutes);
 router.use('/', staffRoutes);
+router.use('/', printRoutes);
 
 // Metrics & Monitoring
 router.use('/metrics', metricsRoutes);

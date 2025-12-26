@@ -1,6 +1,3 @@
-// This is your Prisma schema file
-// Learn more: https://pris.ly/d/prisma-schema
-
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl"]
@@ -8,37 +5,28 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // Note: In Prisma 7, the url is defined in prisma.config.ts, not here
 }
 
-// ==================== USER & AUTH ====================
-
 model User {
-  id            String   @id @default(uuid())
-  name          String
-  email         String   @unique
-  password      String
-  emailVerified Boolean  @default(false)
-  role          Role     @default(OWNER)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations
-  businesses          Business[]
-  sessions            Session[]
+  id                  String               @id @default(uuid())
+  name                String
+  email               String               @unique
+  password            String
+  emailVerified       Boolean              @default(false)
+  role                Role                 @default(OWNER)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   activities          Activity[]
-  paymentMethods      PaymentMethod[]
+  businesses          Business[]
+  ordersCreated       Order[]              @relation("OrderCreatedBy")
+  ordersServed        Order[]              @relation("OrderServedBy")
   passwordResetTokens PasswordResetToken[]
+  paymentMethods      PaymentMethod[]
+  sessions            Session[]
+  staffRecords        Staff[]              @relation("StaffUser")
 
   @@index([email])
   @@map("users")
-}
-
-enum Role {
-  OWNER
-  MANAGER
-  STAFF
-  ADMIN
 }
 
 model Session {
@@ -49,9 +37,7 @@ model Session {
   ipAddress    String?
   expiresAt    DateTime
   createdAt    DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([refreshToken])
@@ -66,9 +52,7 @@ model PasswordResetToken {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -76,84 +60,77 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
-// ==================== BUSINESS & LOCATIONS ====================
-
 model Business {
-  id          String   @id @default(uuid())
-  name        String
-  logo        String?
-  description String?
-  ownerId     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Brand section fields (for footer)
+  id               String     @id @default(uuid())
+  name             String
+  logo             String?
+  description      String?
+  ownerId          String
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
   brandDescription String?
   facebookUrl      String?
   instagramUrl     String?
   twitterUrl       String?
   linkedinUrl      String?
   youtubeUrl       String?
-
-  // About page fields
-  aboutContent String?
-  aboutImage   String?
-
-  // Relations
-  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  locations Location[]
+  aboutContent     String?
+  aboutImage       String?
+  owner            User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  locations        Location[]
 
   @@index([ownerId])
   @@map("businesses")
 }
 
 model Location {
-  id                 String             @id @default(uuid())
-  businessId         String
-  name               String
-  slug               String             @unique
-  address            String
-  city               String
-  state              String
-  zipCode            String
-  country            String             @default("USA")
-  phone              String
-  email              String
-  isActive           Boolean            @default(true)
-  subscriptionStatus SubscriptionStatus @default(TRIAL)
-  subscriptionPlan   SubscriptionPlan   @default(FREE)
-  trialEndsAt        DateTime?
-  openingHours       Json
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-
-  // Contact page fields
-  contactContent String?
-  contactImage   String?
-  mapEmbedUrl    String?
-
-  // Brand customization
-  brandColor String? @default("#ee6620")
-
-  // Usage tracking fields
-  currentMenuItems        Int       @default(0)
-  currentCategories       Int       @default(0)
-  currentBanners          Int       @default(0)
-  currentFeaturedSections Int       @default(0)
-  currentStorageBytes     BigInt    @default(0)
-  monthlyImageUploads     Int       @default(0)
-  monthlyVideoUploads     Int       @default(0)
+  id                      String             @id @default(uuid())
+  businessId              String
+  name                    String
+  slug                    String             @unique
+  address                 String
+  city                    String
+  state                   String
+  zipCode                 String
+  country                 String             @default("USA")
+  phone                   String
+  email                   String
+  isActive                Boolean            @default(true)
+  subscriptionStatus      SubscriptionStatus @default(TRIAL)
+  subscriptionPlan        SubscriptionPlan   @default(FREE)
+  trialEndsAt             DateTime?
+  openingHours            Json
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  contactContent          String?
+  contactImage            String?
+  mapEmbedUrl             String?
+  brandColor              String?            @default("#ee6620")
+  currentMenuItems        Int                @default(0)
+  currentCategories       Int                @default(0)
+  currentBanners          Int                @default(0)
+  currentFeaturedSections Int                @default(0)
+  currentStorageBytes     BigInt             @default(0)
+  monthlyImageUploads     Int                @default(0)
+  monthlyVideoUploads     Int                @default(0)
   monthlyUploadResetDate  DateTime?
   lastUsageUpdate         DateTime?
-
-  // Relations
-  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  categories       Category[]
-  menuItems        MenuItem[]
-  banners          Banner[]
-  featuredSections FeaturedSection[]
-  subscription     Subscription?
-  analytics        Analytics[]
+  enableDelivery          Boolean            @default(false)
+  enableDineIn            Boolean            @default(true)
+  enableTakeaway          Boolean            @default(true)
+  orderPrefix             String?            @default("ORD")
+  serviceChargeRate       Decimal?           @default(0) @db.Decimal(5, 2)
+  taxRate                 Decimal?           @default(0) @db.Decimal(5, 2)
+  analytics               Analytics[]
+  banners                 Banner[]
+  categories              Category[]
+  featuredSections        FeaturedSection[]
+  business                Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  menuItems               MenuItem[]
+  orders                  Order[]
+  staff                   Staff[]
+  subscription            Subscription?
+  tables                  Table[]
 
   @@index([businessId])
   @@index([subscriptionStatus])
@@ -162,38 +139,19 @@ model Location {
   @@map("locations")
 }
 
-enum SubscriptionStatus {
-  TRIAL
-  ACTIVE
-  INACTIVE
-  EXPIRED
-  CANCELLED
-}
-
-enum SubscriptionPlan {
-  FREE // Trial period
-  STANDARD
-  PROFESSIONAL
-  CUSTOM
-}
-
-// ==================== MENU CONTENT ====================
-
 model Category {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
   locationId  String
   name        String
   description String?
   image       String
-  icon        String   @default("ChefHat")
-  isVisible   Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  location  Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  menuItems MenuItem[]
+  icon        String     @default("ChefHat")
+  isVisible   Boolean    @default(true)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  location    Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  menuItems   MenuItem[]
 
   @@index([locationId])
   @@index([isVisible])
@@ -201,12 +159,12 @@ model Category {
 }
 
 model MenuItem {
-  id              String       @id @default(uuid())
+  id              String         @id @default(uuid())
   locationId      String
   categoryId      String
   name            String
   description     String
-  price           Decimal      @db.Decimal(10, 2)
+  price           Decimal        @db.Decimal(10, 2)
   image           String
   images          String[]
   video           String?
@@ -214,31 +172,24 @@ model MenuItem {
   allergens       String[]
   tags            String[]
   nutritionalInfo Json?
-  isVegetarian    Boolean      @default(false)
-  isVegan         Boolean      @default(false)
-  isGlutenFree    Boolean      @default(false)
-  spicyLevel      Int?         @db.SmallInt
-  availability    Availability @default(IN_STOCK)
+  isVegetarian    Boolean        @default(false)
+  isVegan         Boolean        @default(false)
+  isGlutenFree    Boolean        @default(false)
+  spicyLevel      Int?           @db.SmallInt
+  availability    Availability   @default(IN_STOCK)
   preparationTime String?
-  sortOrder       Int          @default(0)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  // Relations
-  location Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  category Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  views    MenuItemView[]
+  sortOrder       Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  views           MenuItemView[]
+  category        Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  location        Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  orderItems      OrderItem[]
 
   @@index([locationId])
   @@index([categoryId])
   @@index([availability])
   @@map("menu_items")
-}
-
-enum Availability {
-  IN_STOCK
-  OUT_OF_STOCK
-  HIDDEN
 }
 
 model Banner {
@@ -253,9 +204,7 @@ model Banner {
   sortOrder  Int      @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-
-  // Relations
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   @@index([locationId])
   @@index([isActive])
@@ -268,24 +217,20 @@ model FeaturedSection {
   title         String
   description   String?
   image         String
-  features      Json // Array of { title: string, description: string }
+  features      Json
   buttonText    String?
   buttonLink    String?
-  imagePosition String   @default("left") // 'left' | 'right'
+  imagePosition String   @default("left")
   isActive      Boolean  @default(true)
   sortOrder     Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-
-  // Relations
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   @@index([locationId])
   @@index([isActive])
   @@map("featured_sections")
 }
-
-// ==================== BILLING & PAYMENTS ====================
 
 model Subscription {
   id                     String             @id @default(uuid())
@@ -303,24 +248,18 @@ model Subscription {
   razorpayPlanId         String?
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
-
-  // Feature flags
-  teamMemberLimit     Int     @default(2)
-  customDomainEnabled Boolean @default(false)
-  apiAccessEnabled    Boolean @default(false)
-  whiteLabelEnabled   Boolean @default(false)
-  ssoEnabled          Boolean @default(false)
-
-  // Grace period and payment retry
-  gracePeriodEndsAt  DateTime?
-  gracePeriodStatus  String? // 'ACTIVE' | 'EXPIRED'
-  lastPaymentAttempt DateTime?
-  paymentRetryCount  Int       @default(0)
-  dunningStatus      String? // 'RETRY_1' | 'RETRY_2' | 'RETRY_3' | 'FINAL_NOTICE'
-
-  // Relations
-  location Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  invoices Invoice[]
+  teamMemberLimit        Int                @default(2)
+  customDomainEnabled    Boolean            @default(false)
+  apiAccessEnabled       Boolean            @default(false)
+  whiteLabelEnabled      Boolean            @default(false)
+  ssoEnabled             Boolean            @default(false)
+  gracePeriodEndsAt      DateTime?
+  gracePeriodStatus      String?
+  lastPaymentAttempt     DateTime?
+  paymentRetryCount      Int                @default(0)
+  dunningStatus          String?
+  invoices               Invoice[]
+  location               Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   @@index([locationId])
   @@index([status])
@@ -328,11 +267,6 @@ model Subscription {
   @@index([nextBillingDate])
   @@index([gracePeriodEndsAt])
   @@map("subscriptions")
-}
-
-enum BillingCycle {
-  MONTHLY
-  YEARLY
 }
 
 model Invoice {
@@ -349,20 +283,11 @@ model Invoice {
   razorpayPaymentId String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
-
-  // Relations
-  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscription      Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId])
   @@index([status])
   @@map("invoices")
-}
-
-enum InvoiceStatus {
-  PENDING
-  PAID
-  FAILED
-  CANCELLED
 }
 
 model PaymentMethod {
@@ -378,15 +303,11 @@ model PaymentMethod {
   razorpayTokenId    String?  @unique
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("payment_methods")
 }
-
-// ==================== ANALYTICS ====================
 
 model Analytics {
   id         String        @id @default(uuid())
@@ -396,21 +317,11 @@ model Analytics {
   count      Int           @default(1)
   metadata   Json?
   date       DateTime      @default(now())
-
-  // Relations
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  location   Location      @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   @@index([locationId, type, date])
   @@index([entityId])
   @@map("analytics")
-}
-
-enum AnalyticsType {
-  MENU_VIEW
-  ITEM_VIEW
-  CATEGORY_VIEW
-  ORDER
-  CLICK
 }
 
 model MenuItemView {
@@ -420,16 +331,12 @@ model MenuItemView {
   ipAddress  String?
   userAgent  String?
   viewedAt   DateTime @default(now())
-
-  // Relations
-  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 
   @@index([menuItemId])
   @@index([viewedAt])
   @@map("menu_item_views")
 }
-
-// ==================== ACTIVITY LOG ====================
 
 model Activity {
   id          String   @id @default(uuid())
@@ -443,17 +350,13 @@ model Activity {
   ipAddress   String?
   userAgent   String?
   createdAt   DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([locationId])
   @@index([createdAt])
   @@map("activities")
 }
-
-// ==================== FILE UPLOADS ====================
 
 model Upload {
   id           String   @id @default(uuid())
@@ -472,4 +375,255 @@ model Upload {
   @@index([userId])
   @@index([entityType, entityId])
   @@map("uploads")
+}
+
+model Table {
+  id         String      @id @default(uuid())
+  locationId String
+  number     Int
+  name       String?
+  capacity   Int         @default(4)
+  status     TableStatus @default(AVAILABLE)
+  qrCode     String?
+  sortOrder  Int         @default(0)
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  orders     Order[]
+  location   Location    @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, number])
+  @@index([locationId])
+  @@index([status])
+  @@map("tables")
+}
+
+model Order {
+  id              String          @id @default(uuid())
+  locationId      String
+  tableId         String?
+  orderNumber     Int
+  type            OrderType       @default(DINE_IN)
+  status          OrderStatus     @default(PENDING)
+  customerName    String?
+  customerPhone   String?
+  customerEmail   String?
+  createdAt       DateTime        @default(now())
+  confirmedAt     DateTime?
+  preparingAt     DateTime?
+  readyAt         DateTime?
+  servedAt        DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  subtotal        Decimal         @db.Decimal(10, 2)
+  taxAmount       Decimal         @default(0) @db.Decimal(10, 2)
+  discountAmount  Decimal         @default(0) @db.Decimal(10, 2)
+  tipAmount       Decimal         @default(0) @db.Decimal(10, 2)
+  totalAmount     Decimal         @db.Decimal(10, 2)
+  paymentStatus   PaymentStatus   @default(PENDING)
+  paymentMethod   String?
+  createdById     String
+  servedById      String?
+  notes           String?
+  specialRequests String?
+  metadata        Json?
+  updatedAt       DateTime        @updatedAt
+  items           OrderItem[]
+  payments        OrderPayment[]
+  timeline        OrderTimeline[]
+  createdBy       User            @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  location        Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  servedBy        User?           @relation("OrderServedBy", fields: [servedById], references: [id])
+  table           Table?          @relation(fields: [tableId], references: [id])
+
+  @@index([locationId])
+  @@index([tableId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([orderNumber])
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String          @id @default(uuid())
+  orderId         String
+  menuItemId      String
+  quantity        Int             @default(1)
+  unitPrice       Decimal         @db.Decimal(10, 2)
+  totalPrice      Decimal         @db.Decimal(10, 2)
+  status          OrderItemStatus @default(PENDING)
+  notes           String?
+  modifiers       Json?
+  sentToKitchenAt DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  menuItem        MenuItem        @relation(fields: [menuItemId], references: [id])
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([menuItemId])
+  @@index([status])
+  @@map("order_items")
+}
+
+model OrderTimeline {
+  id          String   @id @default(uuid())
+  orderId     String
+  action      String
+  description String
+  userId      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("order_timeline")
+}
+
+model OrderPayment {
+  id            String   @id @default(uuid())
+  orderId       String
+  amount        Decimal  @db.Decimal(10, 2)
+  method        String
+  status        String   @default("completed")
+  transactionId String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_payments")
+}
+
+model Staff {
+  id         String       @id @default(uuid())
+  locationId String
+  userId     String?
+  name       String
+  email      String?
+  phone      String?
+  role       StaffRole    @default(WAITER)
+  pin        String?
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  location   Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  user       User?        @relation("StaffUser", fields: [userId], references: [id])
+  shifts     StaffShift[]
+
+  @@unique([locationId, pin])
+  @@index([locationId])
+  @@index([userId])
+  @@map("staff")
+}
+
+model StaffShift {
+  id        String    @id @default(uuid())
+  staffId   String
+  clockIn   DateTime
+  clockOut  DateTime?
+  notes     String?
+  createdAt DateTime  @default(now())
+  staff     Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+  @@index([clockIn])
+  @@map("staff_shifts")
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  STAFF
+  ADMIN
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum SubscriptionPlan {
+  FREE
+  STANDARD
+  PROFESSIONAL
+  CUSTOM
+}
+
+enum Availability {
+  IN_STOCK
+  OUT_OF_STOCK
+  HIDDEN
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum AnalyticsType {
+  MENU_VIEW
+  ITEM_VIEW
+  CATEGORY_VIEW
+  ORDER
+  CLICK
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+enum OrderItemStatus {
+  PENDING
+  SENT_TO_KITCHEN
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+}
+
+enum StaffRole {
+  MANAGER
+  CASHIER
+  WAITER
+  KITCHEN
 }
