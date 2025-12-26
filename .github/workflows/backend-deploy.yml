@@ -111,7 +111,7 @@ jobs:
 
       - name: Extract and deploy
         run: |
-          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} << 'EOF'
+          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} 'bash -l' << 'EOF'
             set -e
             cd /opt/menulogs/prod/app
             
@@ -159,7 +159,7 @@ jobs:
       - name: Rollback on failure
         if: failure()
         run: |
-          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} << 'EOF'
+          ssh ubuntu@${{ secrets.EC2_PROD_HOST}} 'bash -l' << 'EOF'
             set -e
             echo "🔄 Rolling back to previous version..."
             
@@ -172,7 +172,7 @@ jobs:
               cp -r /opt/menulogs/prod/app/backend-backup/$LATEST_BACKUP /opt/menulogs/prod/app/backend
               
               # Restart application
-              cd /opt/menulogs/prod/app/backend
+              cd /opt/menulogs/prod
               pm2 restart menulogs-backend-prod
               
               echo "✅ Rollback completed"

@@ -111,7 +111,7 @@ jobs:
 
       - name: Extract and deploy
         run: |
-          ssh ubuntu@${{ secrets.EC2_DEV_HOST }} << 'EOF'
+          ssh ubuntu@${{ secrets.EC2_DEV_HOST }} 'bash -l' << 'EOF'
             set -e
             cd /opt/menulogs/dev/app
             
