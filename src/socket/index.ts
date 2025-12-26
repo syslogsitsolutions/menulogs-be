@@ -48,14 +48,38 @@ export async function initializeSocket(httpServer: any) {
     cors: {
       origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or Postman)
-        if (!origin) return callback(null, true);
-        
-        if (allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          logger.warn(`⚠️ Socket.IO CORS blocked origin: ${origin}`);
-          callback(new Error('Not allowed by CORS'));
+        if (!origin) {
+          logger.info('✅ Socket.IO: Allowing request with no origin');
+          return callback(null, true);
         }
+        
+        logger.info(`🔍 Socket.IO CORS check - Origin: ${origin}, NODE_ENV: ${process.env.NODE_ENV}`);
+        
+        // Check exact match first
+        if (allowedOrigins.includes(origin)) {
+          logger.info(`✅ Socket.IO: Allowing origin (exact match): ${origin}`);
+          return callback(null, true);
+        }
+        
+        // Allow all menulogs.in subdomains (works in both dev and production)
+        // Matches: https://menulogs.in, https://www.menulogs.in, https://app.menulogs.in, etc.
+        const menulogsRegex = /^https?:\/\/([a-zA-Z0-9-]+\.)?menulogs\.in(:\d+)?$/;
+        if (menulogsRegex.test(origin)) {
+          logger.info(`✅ Socket.IO: Allowing menulogs.in domain: ${origin}`);
+          return callback(null, true);
+        }
+        
+        // Allow localhost for development
+        const localhostRegex = /^https?:\/\/localhost(:\d+)?$/;
+        if (localhostRegex.test(origin)) {
+          logger.info(`✅ Socket.IO: Allowing localhost: ${origin}`);
+          return callback(null, true);
+        }
+        
+        logger.error(`❌ Socket.IO CORS blocked origin: ${origin}`);
+        logger.error(`❌ Allowed origins: ${allowedOrigins.join(', ')}`);
+        logger.error(`❌ NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
+        callback(new Error(`Not allowed by CORS: ${origin}`));
       },
       methods: ['GET', 'POST'],
       credentials: true,
@@ -64,6 +88,12 @@ export async function initializeSocket(httpServer: any) {
     pingTimeout: 60000,
     pingInterval: 25000,
     allowEIO3: true, // Allow Engine.IO v3 clients
+    allowRequest: (req, callback) => {
+      // Additional request validation
+      const origin = req.headers.origin;
+      logger.debug(`🔍 Socket.IO connection attempt from origin: ${origin || 'none'}`);
+      callback(null, true);
+    },
   });
 
   // Redis adapter for multi-server support (production)
@@ -85,9 +115,13 @@ export async function initializeSocket(httpServer: any) {
   // Authentication middleware
   io.use(async (socket: TypedSocket, next) => {
     try {
+      const origin = socket.handshake.headers.origin;
       const token = socket.handshake.auth.token;
 
+      logger.debug(`🔍 Socket auth attempt - Origin: ${origin || 'none'}, Has token: ${!!token}`);
+
       if (!token) {
+        logger.warn(`⚠️ Socket authentication failed: No token provided (Origin: ${origin || 'none'})`);
         return next(new Error('Authentication token required'));
       }
 
@@ -102,11 +136,15 @@ export async function initializeSocket(httpServer: any) {
         email: decoded.email,
       };
 
-      logger.info(`✅ Socket authenticated: ${socket.id} (User: ${decoded.userId})`);
+      logger.info(`✅ Socket authenticated: ${socket.id} (User: ${decoded.userId}, Origin: ${origin || 'none'})`);
       next();
-    } catch (error) {
-      logger.error('❌ Socket authentication failed:', error);
-      next(new Error('Authentication failed'));
+    } catch (error: any) {
+      logger.error('❌ Socket authentication failed:', {
+        error: error.message,
+        stack: error.stack,
+        origin: socket.handshake.headers.origin,
+      });
+      next(new Error(`Authentication failed: ${error.message || 'Invalid token'}`));
     }
   });
 
@@ -114,14 +152,25 @@ export async function initializeSocket(httpServer: any) {
   io.on('connection', async (socket: TypedSocket) => {
     const userId = socket.data.userId;
     const socketId = socket.id;
+    const origin = socket.handshake.headers.origin;
+    const transport = (socket as any).conn?.transport?.name || 'unknown';
 
-    logger.info(`🔌 Client connected: ${socketId} (User: ${userId})`);
+    logger.info(`🔌 Client connected: ${socketId} (User: ${userId}, Origin: ${origin || 'none'}, Transport: ${transport})`);
 
     // Automatically join user's personal room
     socket.join(`user:${userId}`);
 
     // Register event handlers
     registerConnectionHandlers(socket);
+
+    // Monitor transport changes
+    const conn = (socket as any).conn;
+    if (conn) {
+      conn.on('upgrade', () => {
+        const newTransport = conn.transport?.name || 'unknown';
+        logger.info(`⬆️ Transport upgraded for ${socketId}: ${newTransport}`);
+      });
+    }
 
     // Disconnect handling
     socket.on('disconnect', (reason) => {
@@ -130,7 +179,11 @@ export async function initializeSocket(httpServer: any) {
 
     // Error handling
     socket.on('error', (error) => {
-      logger.error(`❌ Socket error: ${socketId}`, error);
+      logger.error(`❌ Socket error: ${socketId}`, {
+        error: error.message || error,
+        origin,
+        transport,
+      });
     });
   });
 
