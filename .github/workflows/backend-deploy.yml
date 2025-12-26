@@ -55,7 +55,6 @@ jobs:
             tsconfig.json \
             prisma.config.js \
             prisma.config.ts \
-            ecosystem.config.js \
             README.md
 
       - name: Upload build artifact
@@ -137,7 +136,7 @@ jobs:
             
             # Restart application with PM2 (zero-downtime)
             cd /opt/menulogs/prod
-            pm2 reload menulogs-backend-prod || PM2_APP_NAME=menulogs-backend-prod PM2_CWD=/opt/menulogs/prod pm2 start app/backend/ecosystem.config.js --update-env
+            pm2 reload menulogs-backend-prod || pm2 start ecosystem.config.js --update-env
             
             # Save PM2 process list
             pm2 save
