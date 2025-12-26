@@ -17,11 +17,11 @@ const startServer = async () => {
   try {
     // Test database connection
     await prisma.$connect();
-    logger.info('✅ Database connected...');
+    logger.info('✅ Database connected');
 
     // Test Redis connection
     await redis.ping();
-    logger.info('✅ Redis connected...');
+    logger.info('✅ Redis connected');
 
     // Create HTTP server
     const httpServer = http.createServer(app);
