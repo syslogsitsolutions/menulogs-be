@@ -51,10 +51,10 @@ export const requireActiveSubscription = async (
       return;
     }
 
-    // Get locationId from params or body
+    // Get locationId from params or body (must be provided by client)
     const locationId = req.params.locationId || req.body.locationId;
     if (!locationId) {
-      res.status(400).json({ error: 'Location ID is required' });
+      res.status(400).json({ error: 'Location ID is required in params or body' });
       return;
     }
 
@@ -150,9 +150,10 @@ export const checkPlanLimit = (
 ) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const locationId = req.params.locationId || req.body.locationId || req.location?.id;
+      // Get locationId from params or body (must be provided by client)
+      const locationId = req.params.locationId || req.body.locationId;
       if (!locationId) {
-        res.status(400).json({ error: 'Location ID is required' });
+        res.status(400).json({ error: 'Location ID is required in params or body' });
         return;
       }
 
@@ -261,9 +262,10 @@ export const checkStorageLimit = async (
 export const checkMonthlyUploadLimit = (uploadType: 'image' | 'video') => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const locationId = req.params.locationId || req.body.locationId || req.location?.id;
+      // Get locationId from params or body (must be provided by client)
+      const locationId = req.params.locationId || req.body.locationId;
       if (!locationId) {
-        res.status(400).json({ error: 'Location ID is required' });
+        res.status(400).json({ error: 'Location ID is required in params or body' });
         return;
       }
 
@@ -323,9 +325,10 @@ export const checkMonthlyUploadLimit = (uploadType: 'image' | 'video') => {
 export const requireFeature = (feature: string) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const locationId = req.params.locationId || req.body.locationId || req.location?.id;
+      // Get locationId from params or body (must be provided by client)
+      const locationId = req.params.locationId || req.body.locationId;
       if (!locationId) {
-        res.status(400).json({ error: 'Location ID is required' });
+        res.status(400).json({ error: 'Location ID is required in params or body' });
         return;
       }
 

@@ -324,6 +324,12 @@ export class MenuItemController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId;
+      
+      if (!locationId) {
+        res.status(400).json({ error: 'Location ID is required in request body' });
+        return;
+      }
       
       // Handle both uploadFields (object) and uploadMultiple (array) formats
       let files: Express.Multer.File[] | undefined;
@@ -342,7 +348,7 @@ export class MenuItemController {
       const bodyData = req.body;
 
       const existing = await prisma.menuItem.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -399,16 +405,13 @@ export class MenuItemController {
             size: processedBuffer.length,
           };
 
-          // Get locationId from existing menu item
-          const menuItemLocation = existing.locationId;
-          
           return uploadToS3({
             file: processedFile,
             entityType: 'menu-item',
             entityId: id,
             userId,
             filename: `image-${fileIndex}`,
-            locationId: menuItemLocation,
+            locationId: locationId,
           });
         });
 
@@ -533,10 +536,10 @@ export class MenuItemController {
 
       // Clear menu cache for this location
       const location = await prisma.location.findUnique({
-        where: { id: existing.locationId },
+        where: { id: locationId },
         select: { slug: true },
       });
-      await clearMenuCache(existing.locationId, location?.slug);
+      await clearMenuCache(locationId, location?.slug);
 
       res.json({ message: 'Menu item updated', menuItem });
     } catch (error) {
@@ -563,9 +566,15 @@ export class MenuItemController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
+      const locationId = req.body.locationId;
+
+      if (!locationId) {
+        res.status(400).json({ error: 'Location ID is required in request body' });
+        return;
+      }
 
       const existing = await prisma.menuItem.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -588,8 +597,7 @@ export class MenuItemController {
         }
       }
 
-      // Get location info before deletion
-      const locationId = existing.locationId;
+      // Get location info before deletion (locationId already from request body)
       const location = await prisma.location.findUnique({
         where: { id: locationId },
         select: { slug: true },
@@ -621,14 +629,20 @@ export class MenuItemController {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
-      const { availability } = z
+      const { availability, locationId } = z
         .object({
           availability: z.enum(['IN_STOCK', 'OUT_OF_STOCK', 'HIDDEN']),
+          locationId: z.string().uuid(),
         })
         .parse(req.body);
 
+      if (!locationId) {
+        res.status(400).json({ error: 'Location ID is required in request body' });
+        return;
+      }
+
       const existing = await prisma.menuItem.findFirst({
-        where: { id, location: { business: { ownerId: userId } } },
+        where: { id, locationId, location: { business: { ownerId: userId } } },
       });
 
       if (!existing) {
@@ -643,10 +657,10 @@ export class MenuItemController {
 
       // Clear menu cache for this location
       const location = await prisma.location.findUnique({
-        where: { id: existing.locationId },
+        where: { id: locationId },
         select: { slug: true },
       });
-      await clearMenuCache(existing.locationId, location?.slug);
+      await clearMenuCache(locationId, location?.slug);
 
       res.json({ message: 'Availability updated', menuItem });
     } catch (error) {
