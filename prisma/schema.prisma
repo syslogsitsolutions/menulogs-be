@@ -118,6 +118,7 @@ model Location {
   enableDelivery          Boolean            @default(false)
   enableDineIn            Boolean            @default(true)
   enableTakeaway          Boolean            @default(true)
+  enableOrders            Boolean            @default(true)
   orderPrefix             String?            @default("ORD")
   serviceChargeRate       Decimal?           @default(0) @db.Decimal(5, 2)
   taxRate                 Decimal?           @default(0) @db.Decimal(5, 2)

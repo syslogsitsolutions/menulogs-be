@@ -31,6 +31,8 @@ const locationSchema = z.object({
   mapEmbedUrl: z.string().url().optional().or(z.literal('')),
   // Brand customization
   brandColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  // Location settings
+  enableOrders: z.boolean().optional(),
 });
 
 export class LocationController {
@@ -111,6 +113,9 @@ export class LocationController {
       const parsedBodyData = {
         ...bodyData,
         isActive: bodyData.isActive === 'true' || bodyData.isActive === true,
+        enableOrders: bodyData.enableOrders !== undefined 
+          ? (bodyData.enableOrders === 'true' || bodyData.enableOrders === true)
+          : undefined,
       };
 
       const data = locationSchema.parse({
@@ -352,6 +357,9 @@ export class LocationController {
       };
       if (bodyData.isActive !== undefined) {
         parsedBodyData.isActive = bodyData.isActive === 'true' || bodyData.isActive === true;
+      }
+      if (bodyData.enableOrders !== undefined) {
+        parsedBodyData.enableOrders = bodyData.enableOrders === 'true' || bodyData.enableOrders === true;
       }
 
       const data = locationSchema.partial().parse({
