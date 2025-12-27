@@ -29,6 +29,7 @@ const locationSchema = z.object({
   contactContent: z.string().optional(),
   contactImage: z.string().url().optional().or(z.string().startsWith('data:image/')).optional(),
   mapEmbedUrl: z.string().url().optional().or(z.literal('')),
+  googleReviewUrl: z.string().url().optional().or(z.literal('')),
   // Brand customization
   brandColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   // Location settings
@@ -184,6 +185,7 @@ export class LocationController {
           contactContent: data.contactContent || undefined,
           contactImage: data.contactImage || undefined,
           mapEmbedUrl: data.mapEmbedUrl || undefined,
+          googleReviewUrl: data.googleReviewUrl || undefined,
           brandColor: data.brandColor || undefined,
           businessId,
           trialEndsAt,

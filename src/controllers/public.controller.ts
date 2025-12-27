@@ -33,6 +33,8 @@ export class PublicController {
           email: true,
           openingHours: true,
           brandColor: true,
+          mapEmbedUrl: true,
+          googleReviewUrl: true,
           business: {
             select: {
               name: true,
