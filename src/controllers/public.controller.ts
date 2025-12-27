@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import prisma from '../config/database';
 import redis from '../config/redis';
+import emailService from '../services/email.service';
+import { getContactFormTemplate } from '../templates/email';
+import { logger } from '../utils/logger.util';
 
 const CACHE_TTL = 3600; // 1 hour
 
@@ -476,6 +480,74 @@ export class PublicController {
 
       res.json(response);
     } catch (error) {
+      next(error);
+    }
+  }
+
+  // POST /api/v1/public/contact
+  async submitContactForm(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      // Validation schema
+      const contactSchema = z.object({
+        name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+        email: z.string().email('Invalid email address'),
+        company: z.string().max(200).optional().nullable(),
+        phone: z.string().max(20).optional().nullable(),
+        plan: z.enum(['STANDARD', 'PROFESSIONAL', 'CUSTOM']).optional().nullable(),
+        message: z.string().min(10, 'Message must be at least 10 characters').max(2000),
+      });
+
+      const validatedData = contactSchema.parse(req.body);
+
+      // Generate email HTML
+      const emailHtml = getContactFormTemplate(
+        validatedData.name,
+        validatedData.email,
+        validatedData.company || null,
+        validatedData.phone || null,
+        validatedData.plan || null,
+        validatedData.message
+      );
+
+      // Create subject
+      const planDisplay = validatedData.plan 
+        ? `${validatedData.plan.charAt(0)}${validatedData.plan.slice(1).toLowerCase()} Plan`
+        : 'General Inquiry';
+      const subject = `Contact Form: ${planDisplay} - ${validatedData.company || validatedData.name}`;
+
+      // Send email (non-blocking)
+      emailService.sendEmail({
+        to: 'dev.menulogs@gmail.com',
+        subject,
+        html: emailHtml,
+        replyTo: validatedData.email,
+      }).catch((error) => {
+        logger.error('Failed to send contact form email', {
+          error: error instanceof Error ? error.message : String(error),
+          contactEmail: validatedData.email,
+        });
+        // Don't throw - email failure shouldn't block the response
+      });
+
+      logger.info('Contact form submitted', {
+        name: validatedData.name,
+        email: validatedData.email,
+        plan: validatedData.plan || 'General',
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Thank you for contacting us! We will get back to you within 24 hours.',
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          success: false,
+          error: 'Validation error',
+          details: error.errors,
+        });
+        return;
+      }
       next(error);
     }
   }

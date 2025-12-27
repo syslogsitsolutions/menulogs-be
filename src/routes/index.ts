@@ -17,6 +17,7 @@ import orderRoutes from './order.routes';
 import staffRoutes from './staff.routes';
 import metricsRoutes from './metrics.routes';
 import printRoutes from './print.routes';
+import analyticsRoutes from './analytics.routes';
 
 const router = Router();
 
@@ -46,6 +47,9 @@ router.use('/', printRoutes);
 // Metrics & Monitoring
 router.use('/metrics', metricsRoutes);
 
+// Analytics & Reports
+router.use('/analytics', analyticsRoutes);
+
 // API info
 router.get('/', (_req, res) => {
   res.json({
@@ -71,6 +75,8 @@ router.get('/', (_req, res) => {
       orders: '/api/v1/locations/:locationId/orders',
       staff: '/api/v1/locations/:locationId/staff',
       kitchenOrders: '/api/v1/locations/:locationId/kitchen-orders',
+      analytics: '/api/v1/analytics/locations/:locationId',
+      reports: '/api/v1/analytics/locations/:locationId/reports/summary',
     },
   });
 });

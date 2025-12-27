@@ -25,11 +25,11 @@ export const PRICING_PLANS = {
     priceYearly: 0,
     interval: 'MONTHLY',
     features: {
-      menuItems: 5,
-      categories: 2,
-      banners: 0,
-      featuredSections: 0,
-      analytics: 'basic',
+      menuItems: 100,
+      categories: 20,
+      banners: 2,
+      featuredSections: 1,
+      // analytics: 'basic',
       support: 'email',
       customDomain: false,
       apiAccess: false,
@@ -38,17 +38,17 @@ export const PRICING_PLANS = {
       menuVersioning: false,
       abTesting: false,
       customWorkflows: false,
-      sso: false,
+      // sso: false,
     },
     limits: {
-      menuItems: 5,
-      categories: 2,
-      banners: 1,
+      menuItems: 100,
+      categories: 20,
+      banners: 5,
       featuredSections: 1,
-      imageStorageBytes: 100 * 1024 * 1024, // 100 MB
-      videoStorageBytes: 0,
-      monthlyImageUploads: 20,
-      monthlyVideoUploads: 0,
+      imageStorageBytes: 2 * 1024 * 1024 * 1024, // 2 GB
+      videoStorageBytes: 100 * 1024 * 1024, // 100 MB
+      monthlyImageUploads: 200,
+      monthlyVideoUploads: 5,
       teamMembers: 2,
     },
   },
@@ -56,15 +56,15 @@ export const PRICING_PLANS = {
     id: 'STANDARD',
     name: 'Standard',
     description: 'Best for single location restaurants',
-    price: CURRENCY === 'INR' ? 499 : 5,
-    priceYearly: CURRENCY === 'INR' ? 4990 : 50, // 17% discount
+    price: CURRENCY === 'INR' ? 599 : 6,
+    priceYearly: CURRENCY === 'INR' ? 5990 : 60, // 17% discount
     interval: 'MONTHLY',
     features: {
       menuItems: 100,
       categories: 20,
-      banners: 5,
+      banners: 2,
       featuredSections: 1,
-      analytics: 'basic',
+      // analytics: 'basic',
       support: 'email',
       customDomain: false,
       apiAccess: false,
@@ -73,7 +73,7 @@ export const PRICING_PLANS = {
       menuVersioning: false,
       abTesting: false,
       customWorkflows: false,
-      sso: false,
+      // sso: false,
     },
     limits: {
       menuItems: 100,
@@ -91,35 +91,35 @@ export const PRICING_PLANS = {
     id: 'PROFESSIONAL',
     name: 'Professional',
     description: 'For growing restaurant chains',
-    price: CURRENCY === 'INR' ? 1499 : 15,
-    priceYearly: CURRENCY === 'INR' ? 14990 : 150, // 17% discount
+    price: CURRENCY === 'INR' ? 999 : 10,
+    priceYearly: CURRENCY === 'INR' ? 9990 : 100, // 17% discount
     interval: 'MONTHLY',
     features: {
       menuItems: 500,
       categories: 50,
-      banners: 20,
-      featuredSections: 3,
-      analytics: 'advanced',
+      banners: 5,
+      featuredSections: 5,
+      // analytics: 'advanced',
       support: 'priority',
-      customDomain: true,
       apiAccess: true,
+      customDomain: false,
       whiteLabel: false,
-      multiLanguage: true,
-      menuVersioning: true,
+      multiLanguage: false,
+      menuVersioning: false,
       abTesting: false,
       customWorkflows: false,
-      sso: false,
+      // sso: false,
     },
     limits: {
       menuItems: 500,
       categories: 50,
-      banners: 20,
-      featuredSections: 3,
+      banners: 5,
+      featuredSections: 5,
       imageStorageBytes: 10 * 1024 * 1024 * 1024, // 10 GB
       videoStorageBytes: 1 * 1024 * 1024 * 1024, // 1 GB
       monthlyImageUploads: 1000,
       monthlyVideoUploads: 25,
-      teamMembers: 5,
+      teamMembers: 20,
     },
   },
   CUSTOM: {
@@ -226,7 +226,7 @@ export class SubscriptionService {
         customDomainEnabled: featureFlags.customDomainEnabled,
         apiAccessEnabled: featureFlags.apiAccessEnabled,
         whiteLabelEnabled: featureFlags.whiteLabelEnabled,
-        ssoEnabled: featureFlags.ssoEnabled,
+        // ssoEnabled: featureFlags.ssoEnabled,
       },
     });
 
@@ -375,7 +375,7 @@ export class SubscriptionService {
         customDomainEnabled: featureFlags.customDomainEnabled,
         apiAccessEnabled: featureFlags.apiAccessEnabled,
         whiteLabelEnabled: featureFlags.whiteLabelEnabled,
-        ssoEnabled: featureFlags.ssoEnabled,
+        // ssoEnabled: featureFlags.ssoEnabled,
       },
     });
 
@@ -401,7 +401,7 @@ export class SubscriptionService {
       customDomainEnabled: planDetails.features.customDomain,
       apiAccessEnabled: planDetails.features.apiAccess,
       whiteLabelEnabled: planDetails.features.whiteLabel,
-      ssoEnabled: planDetails.features.sso,
+      // ssoEnabled: planDetails.features.sso,
     };
   }
 
@@ -591,7 +591,7 @@ export class SubscriptionService {
           customDomainEnabled: featureFlags.customDomainEnabled,
           apiAccessEnabled: featureFlags.apiAccessEnabled,
           whiteLabelEnabled: featureFlags.whiteLabelEnabled,
-          ssoEnabled: featureFlags.ssoEnabled,
+          // ssoEnabled: featureFlags.ssoEnabled,
           // Clear grace period if any
           gracePeriodStatus: null,
           gracePeriodEndsAt: null,

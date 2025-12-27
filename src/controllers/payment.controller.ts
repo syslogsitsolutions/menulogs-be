@@ -45,12 +45,12 @@ const refundPaymentSchema = z.object({
 
 const PRICING_PLANS = {
   STANDARD: {
-    monthly: 49900, // in paise (₹499.00 or $5.00)
-    yearly: 499000, // in paise (₹4,990.00 or $50.00) - 17% discount
+    monthly: 59900, // in paise (599.00 or $5.99)
+    yearly: 599000, // in paise (5990.00 or $59.90) - 17% discount
   },
   PROFESSIONAL: {
-    monthly: 149900, // in paise (₹1,499.00 or $15.00)
-    yearly: 1499000, // in paise (₹14,990.00 or $150.00) - 17% discount
+    monthly: 99900, // in paise (999.00 or $9.99)
+    yearly: 999000, // in paise (9990.00 or $99.90) - 17% discount
   },
   CUSTOM: {
     monthly: 499900, // in paise (₹4,999.00 or $50.00) - starting price
@@ -318,7 +318,7 @@ export class PaymentController {
           customDomainEnabled: featureFlags.customDomainEnabled,
           apiAccessEnabled: featureFlags.apiAccessEnabled,
           whiteLabelEnabled: featureFlags.whiteLabelEnabled,
-          ssoEnabled: featureFlags.ssoEnabled,
+          // ssoEnabled: featureFlags.ssoEnabled,
         },
         update: {
           plan: data.plan as any, // Type assertion needed until Prisma client is regenerated
@@ -334,7 +334,7 @@ export class PaymentController {
           customDomainEnabled: featureFlags.customDomainEnabled,
           apiAccessEnabled: featureFlags.apiAccessEnabled,
           whiteLabelEnabled: featureFlags.whiteLabelEnabled,
-          ssoEnabled: featureFlags.ssoEnabled,
+          // ssoEnabled: featureFlags.ssoEnabled,
         },
       });
 

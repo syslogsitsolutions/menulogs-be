@@ -13,4 +13,5 @@ export { getSubscriptionActivatedTemplate } from './subscription-activated.templ
 export { getSubscriptionCancelledTemplate } from './subscription-cancelled.template';
 export { getNewOrderTemplate } from './new-order.template';
 export { getNewReviewTemplate } from './new-review.template';
+export { getContactFormTemplate } from './contact-form.template';
 

@@ -54,7 +54,7 @@ async function main() {
       state: 'NY',
       zipCode: '10001',
       country: 'USA',
-      phone: '+1 (555) 123-4567',
+      phone: '+91 99999-12345',
       email: 'downtown@restaurant.com',
       isActive: true,
       subscriptionStatus: 'ACTIVE',

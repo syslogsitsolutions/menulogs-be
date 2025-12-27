@@ -423,6 +423,10 @@ export class OrderController {
           break;
         case 'COMPLETED':
           updateData.completedAt = now;
+          // Automatically mark as PAID when order is completed (if not already PAID or REFUNDED)
+          if (existing.paymentStatus !== 'PAID' && existing.paymentStatus !== 'REFUNDED') {
+            updateData.paymentStatus = 'PAID';
+          }
           break;
         case 'CANCELLED':
           updateData.cancelledAt = now;
@@ -443,11 +447,15 @@ export class OrderController {
       });
 
       // Add timeline entry
+      const timelineDescription = status === 'COMPLETED' && updateData.paymentStatus === 'PAID' && existing.paymentStatus !== 'PAID'
+        ? `Order status changed to ${status} and marked as PAID`
+        : `Order status changed to ${status}`;
+      
       await prisma.orderTimeline.create({
         data: {
           orderId: id,
           action: 'status_changed',
-          description: `Order status changed to ${status}`,
+          description: timelineDescription,
           userId,
         },
       });

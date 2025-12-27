@@ -29,5 +29,8 @@ router.get(
 router.get('/menu-items/:id', publicController.getMenuItem.bind(publicController));
 router.get('/search', publicController.search.bind(publicController));
 
+// Contact form submission
+router.post('/contact', publicController.submitContactForm.bind(publicController));
+
 export default router;
 
