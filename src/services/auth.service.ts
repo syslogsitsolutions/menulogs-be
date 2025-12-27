@@ -34,6 +34,7 @@ export class AuthService {
         name: true,
         email: true,
         role: true,
+        emailVerified: true,
         createdAt: true,
       },
     });
@@ -61,11 +62,17 @@ export class AuthService {
     });
 
     // Send welcome email (non-blocking)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const dashboardLink = `${frontendUrl}/dashboard`;
+    // const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    // const dashboardLink = `${frontendUrl}/dashboard`;
     
-    emailService.sendWelcomeEmail(user.email, user.name, dashboardLink).catch((error) => {
-      console.error('[Email Error] Failed to send welcome email:', error);
+    // emailService.sendWelcomeEmail(user.email, user.name, dashboardLink).catch((error) => {
+    //   console.error('[Email Error] Failed to send welcome email:', error);
+    //   // Don't throw - email failure shouldn't block signup
+    // });
+
+    // Send email verification email (non-blocking)
+    this.sendVerificationEmail(user.id, user.email, user.name).catch((error) => {
+      console.error('[Email Error] Failed to send verification email:', error);
       // Don't throw - email failure shouldn't block signup
     });
 
@@ -134,6 +141,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        emailVerified: user.emailVerified,
       },
       business: serializedBusinesses[0] || null,
       locations: serializedBusinesses[0]?.locations || [],
@@ -379,6 +387,95 @@ export class AuthService {
     // Invalidate all sessions for security (user will need to login again)
     await prisma.session.deleteMany({
       where: { userId },
+    });
+  }
+
+  // Send email verification email
+  async sendVerificationEmail(userId: string, email: string, userName: string): Promise<void> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // If already verified, don't send email
+    if (user.emailVerified) {
+      return;
+    }
+
+    // Generate secure token
+    const token = crypto.randomBytes(32).toString('hex');
+    
+    // Set expiration to 24 hours
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+
+    // Invalidate any existing unused tokens for this user
+    await prisma.emailVerificationToken.updateMany({
+      where: {
+        userId: user.id,
+        used: false,
+      },
+      data: {
+        used: true,
+      },
+    });
+
+    // Create new verification token
+    await prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        token,
+        expiresAt,
+      },
+    });
+
+    // Send verification email
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const verificationLink = `${frontendUrl}/verify-email?token=${token}`;
+    
+    await emailService.sendVerificationEmail(email, userName, verificationLink);
+  }
+
+  // Verify email using token
+  async verifyEmail(token: string): Promise<void> {
+    // Find valid token
+    const verificationToken = await prisma.emailVerificationToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!verificationToken) {
+      throw new Error('Invalid or expired verification token');
+    }
+
+    // Check if token is used
+    if (verificationToken.used) {
+      throw new Error('Verification token has already been used');
+    }
+
+    // Check if token is expired
+    if (verificationToken.expiresAt < new Date()) {
+      // Mark as used even though expired
+      await prisma.emailVerificationToken.update({
+        where: { id: verificationToken.id },
+        data: { used: true },
+      });
+      throw new Error('Verification token has expired');
+    }
+
+    // Update user emailVerified status
+    await prisma.user.update({
+      where: { id: verificationToken.userId },
+      data: { emailVerified: true },
+    });
+
+    // Mark token as used
+    await prisma.emailVerificationToken.update({
+      where: { id: verificationToken.id },
+      data: { used: true },
     });
   }
 }

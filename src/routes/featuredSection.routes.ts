@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import featuredSectionController from '../controllers/featuredSection.controller';
 import { authenticate } from '../middleware/auth.middleware';
+import { requireEmailVerification } from '../middleware/emailVerification.middleware';
 import { uploadSingle } from '../middleware/upload.middleware';
 import {
   requireActiveSubscription,
@@ -11,7 +12,7 @@ import {
 const router = Router();
 
 router.use(authenticate);
-
+router.use(requireEmailVerification);
 router.post(
   '/locations/:locationId',
   requireActiveSubscription,

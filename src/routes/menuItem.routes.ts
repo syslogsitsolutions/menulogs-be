@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import menuItemController from '../controllers/menuItem.controller';
 import { authenticate } from '../middleware/auth.middleware';
+import { requireEmailVerification } from '../middleware/emailVerification.middleware';
 import { uploadFields } from '../middleware/upload.middleware';
 import {
   requireActiveSubscription,
@@ -11,6 +12,7 @@ import {
 const router = Router();
 
 router.use(authenticate);
+router.use(requireEmailVerification); // All menu item routes require email verification
 
 // POST route: require subscription, check plan limit, check storage limit
 router.post(

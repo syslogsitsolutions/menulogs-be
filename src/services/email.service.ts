@@ -81,14 +81,11 @@ export class EmailService {
 
     const { apiToken } = emailConfig.zeptomail;
 
-    // ZeptoMail API endpoint
-    const apiUrl = 'https://api.zeptomail.com/v1.1/email';
+    const apiUrl = 'https://api.zeptomail.in/v1.1/email';
 
-    // Prepare email data
     const emailData: any = {
       from: {
         address: options.from || emailConfig.from,
-        name: options.fromName || emailConfig.fromName,
       },
       to: [
         {
@@ -99,15 +96,12 @@ export class EmailService {
       ],
       subject: options.subject,
       htmlbody: options.html,
-      textbody: options.text || this.htmlToText(options.html),
     };
 
-    // Add reply-to if specified
-    if (options.replyTo || emailConfig.replyTo) {
-      emailData.reply_to_address = {
-        address: options.replyTo || emailConfig.replyTo,
-      };
+    if (options.text) {
+      emailData.textbody = options.text;
     }
+
 
     // Use template if templateId is provided
     if (options.templateId && options.templateData) {
@@ -115,17 +109,62 @@ export class EmailService {
       emailData.template_data = options.templateData;
     }
 
-    // Send via ZeptoMail API
-    // ZeptoMail uses: Authorization: zoho-enczapikey <send mail token>
-    const response = await axios.post(apiUrl, emailData, {
-      headers: {
-        'Authorization': `zoho-enczapikey ${apiToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    try {
+      const response = await axios.post(apiUrl, emailData, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Zoho-enczapikey ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (response.status !== 200) {
-      throw new Error(`ZeptoMail API error: ${response.statusText}`);
+      // Check if response is successful (2xx status codes)
+      if (response.status >= 200 && response.status < 300) {
+        if (response.data && typeof response.data === 'object') {
+          if (response.data.error || response.data.message === 'error') {
+            const errorMsg = response.data.error || response.data.message || 'Unknown error';
+            logger.error('ZeptoMail API returned error in response body', {
+              status: response.status,
+              data: response.data,
+            });
+            throw new Error(`ZeptoMail API error: ${errorMsg}`);
+          }
+        }
+        return;
+      }
+
+      // Non-success status code
+      logger.error('ZeptoMail API returned non-success status', {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data,
+      });
+      throw new Error(
+        `ZeptoMail API error (${response.status}): ${response.statusText || 'Unknown error'}`
+      );
+    } catch (error: any) {
+      // If error was already thrown above, re-throw it
+      if (error.response) {
+        // Axios error with response
+        logger.error('ZeptoMail API error response', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+        });
+        const errorMsg = error.response.data?.error || 
+                        error.response.data?.message || 
+                        error.response.statusText || 
+                        'Unknown error';
+        throw new Error(
+          `ZeptoMail API error (${error.response.status}): ${errorMsg}`
+        );
+      }
+      // Re-throw if it's already our Error object
+      if (error instanceof Error) {
+        throw error;
+      }
+      // Generic error
+      throw new Error(`ZeptoMail API error: ${error.message || String(error)}`);
     }
   }
 

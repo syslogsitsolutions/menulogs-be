@@ -252,6 +252,65 @@ export class AuthController {
       next(error);
     }
   }
+
+  // POST /api/v1/auth/send-verification-email
+  async sendVerificationEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      
+      // Get user to get email and name
+      const currentUserData = await authService.getCurrentUser(userId);
+      
+      if (currentUserData.user.emailVerified) {
+        res.json({
+          message: 'Email is already verified',
+        });
+        return;
+      }
+
+      await authService.sendVerificationEmail(
+        userId,
+        currentUserData.user.email,
+        currentUserData.user.name
+      );
+
+      res.json({
+        message: 'Verification email sent successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // POST /api/v1/auth/verify-email
+  async verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.body;
+      
+      if (!token || typeof token !== 'string') {
+        res.status(400).json({ error: 'Verification token is required' });
+        return;
+      }
+
+      await authService.verifyEmail(token);
+
+      res.json({
+        message: 'Email verified successfully',
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        if (
+          error.message.includes('Invalid') ||
+          error.message.includes('expired') ||
+          error.message.includes('used')
+        ) {
+          res.status(400).json({ error: error.message });
+          return;
+        }
+      }
+      next(error);
+    }
+  }
 }
 
 export default new AuthController();

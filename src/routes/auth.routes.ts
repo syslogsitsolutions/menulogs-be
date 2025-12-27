@@ -13,9 +13,13 @@ router.post('/logout', authController.logout.bind(authController));
 router.post('/forgot-password', authLimiter, authController.forgotPassword.bind(authController));
 router.post('/reset-password', authLimiter, authController.resetPassword.bind(authController));
 
-// Protected routes
+// Protected routes (no email verification required for these)
 router.get('/me', authenticate, authController.me.bind(authController));
 router.post('/change-password', authenticate, authController.changePassword.bind(authController));
+router.post('/send-verification-email', authenticate, authLimiter, authController.sendVerificationEmail.bind(authController));
+
+// Public route (token in body)
+router.post('/verify-email', authLimiter, authController.verifyEmail.bind(authController));
 
 export default router;
 

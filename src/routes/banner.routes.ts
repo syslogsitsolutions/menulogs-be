@@ -7,10 +7,12 @@ import {
   checkPlanLimit,
   checkStorageLimit,
 } from '../middleware/subscription.middleware';
+import { requireEmailVerification } from '../middleware/emailVerification.middleware';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(requireEmailVerification); // All banner routes require email verification
 
 router.post(
   '/locations/:locationId',

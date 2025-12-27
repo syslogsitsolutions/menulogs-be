@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import categoryController from '../controllers/category.controller';
 import { authenticate } from '../middleware/auth.middleware';
+import { requireEmailVerification } from '../middleware/emailVerification.middleware';
 import { uploadSingle } from '../middleware/upload.middleware';
 import {
   requireActiveSubscription,
@@ -11,6 +12,7 @@ import {
 const router = Router();
 
 router.use(authenticate);
+router.use(requireEmailVerification); // All category routes require email verification
 
 router.post(
   '/locations/:locationId',
