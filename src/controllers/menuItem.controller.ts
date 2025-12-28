@@ -84,7 +84,7 @@ export class MenuItemController {
   }
 
   // Helper method to normalize image data
-  private normalizeImageData(data: any): { image: string; images: string[] } {
+  private normalizeImageData(data: any): { image: string | null; images: string[] } {
     let images: string[] = [];
     
     // If images array is provided, use it
@@ -106,13 +106,9 @@ export class MenuItemController {
     // Ensure maximum 3 images
     images = images.slice(0, 3);
     
-    // Ensure we have at least one image (main image)
-    if (images.length === 0) {
-      throw new Error('At least one image is required');
-    }
-    
+    // Images are now optional - return null if no images provided
     return {
-      image: images[0], // Main image is always at index 0
+      image: images.length > 0 ? images[0] : null, // Main image is at index 0, or null if no images
       images: images,
     };
   }
@@ -226,8 +222,8 @@ export class MenuItemController {
         name: bodyData.name,
         description: bodyData.description,
         price: typeof bodyData.price === 'string' ? parseFloat(bodyData.price) : bodyData.price,
-        image: finalImageUrls ? finalImageUrls[0] : bodyData.image || '',
-        images: finalImageUrls,
+        image: finalImageUrls ? finalImageUrls[0] : bodyData.image || undefined,
+        images: finalImageUrls || [],
         video: bodyData.video || undefined,
         ingredients: bodyData.ingredients ? (typeof bodyData.ingredients === 'string' ? JSON.parse(bodyData.ingredients) : bodyData.ingredients) : [],
         allergens: bodyData.allergens ? (typeof bodyData.allergens === 'string' ? JSON.parse(bodyData.allergens) : bodyData.allergens) : [],
@@ -303,10 +299,6 @@ export class MenuItemController {
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: 'Validation error', errors: error.errors });
-        return;
-      }
-      if (error instanceof Error && error.message === 'At least one image is required') {
-        res.status(400).json({ error: error.message });
         return;
       }
       if (error instanceof Error) {
@@ -523,7 +515,7 @@ export class MenuItemController {
         
         data = {
           ...data,
-          image: normalized.image,
+          image: normalized.image || undefined,
           images: normalized.images,
         };
       }
@@ -545,10 +537,6 @@ export class MenuItemController {
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: 'Validation error', errors: error.errors });
-        return;
-      }
-      if (error instanceof Error && error.message === 'At least one image is required') {
-        res.status(400).json({ error: error.message });
         return;
       }
       if (error instanceof Error) {
