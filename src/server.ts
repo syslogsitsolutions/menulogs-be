@@ -19,9 +19,20 @@ const startServer = async () => {
     await prisma.$connect();
     logger.info('✅ Database connected...');
 
-    // Test Redis connection
-    await redis.ping();
-    logger.info('✅ Redis connected...');
+    // Test Redis connection with proper error handling
+    try {
+      await redis.ping();
+      logger.info('✅ Redis connected...');
+    } catch (redisError: any) {
+      logger.error('❌ Redis connection failed:', redisError.message);
+      if (redisError.message.includes('NOAUTH') || redisError.message.includes('Authentication required')) {
+        logger.error('⚠️ Redis requires authentication. Please set REDIS_PASSWORD or REDIS_URL environment variable.');
+        logger.warn('⚠️ Server will continue without Redis caching. Some features may be limited.');
+      } else {
+        logger.warn('⚠️ Redis connection failed. Server will continue without Redis caching.');
+      }
+      // Don't exit - allow server to start without Redis
+    }
 
     // Create HTTP server
     const httpServer = http.createServer(app);
@@ -47,18 +58,32 @@ const startServer = async () => {
   }
 };
 
+// Handle unhandled promise rejections (like Redis errors)
+process.on('unhandledRejection', (reason: any, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason?.message || reason);
+  // Don't exit - log and continue
+});
+
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully...');
   await prisma.$disconnect();
-  await redis.quit();
+  try {
+    await redis.quit();
+  } catch (error) {
+    logger.warn('Error closing Redis connection:', error);
+  }
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully...');
   await prisma.$disconnect();
-  await redis.quit();
+  try {
+    await redis.quit();
+  } catch (error) {
+    logger.warn('Error closing Redis connection:', error);
+  }
   process.exit(0);
 });
 

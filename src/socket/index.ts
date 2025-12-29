@@ -99,16 +99,44 @@ export async function initializeSocket(httpServer: any) {
   // Redis adapter for multi-server support (production)
   if (process.env.REDIS_URL) {
     try {
-      const pubClient = createClient({ url: process.env.REDIS_URL });
+      const redisUrl = process.env.REDIS_URL;
+      
+      // Build Redis config - support both URL format and individual env vars
+      let redisConfig: { url?: string; socket?: { host: string; port: number }; password?: string } = {};
+      
+      if (redisUrl) {
+        redisConfig.url = redisUrl;
+      } else {
+        // Fallback to individual env vars if REDIS_URL not provided
+        redisConfig.socket = {
+          host: process.env.REDIS_HOST || 'localhost',
+          port: parseInt(process.env.REDIS_PORT || '6379'),
+        };
+        if (process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '') {
+          redisConfig.password = process.env.REDIS_PASSWORD;
+        }
+      }
+
+      const pubClient = createClient(redisConfig);
       const subClient = pubClient.duplicate();
+
+      // Add error handlers to prevent unhandled rejections
+      pubClient.on('error', (err) => {
+        logger.error('❌ Redis pub client error:', err.message);
+      });
+
+      subClient.on('error', (err) => {
+        logger.error('❌ Redis sub client error:', err.message);
+      });
 
       await Promise.all([pubClient.connect(), subClient.connect()]);
 
       io.adapter(createAdapter(pubClient, subClient));
       logger.info('✅ Socket.IO Redis adapter configured');
-    } catch (error) {
-      logger.error('❌ Failed to connect Redis adapter:', error);
+    } catch (error: any) {
+      logger.error('❌ Failed to connect Redis adapter:', error.message || error);
       logger.warn('⚠️  Running without Redis - single server mode only');
+      // Don't throw - allow server to continue without Redis adapter
     }
   }
 
